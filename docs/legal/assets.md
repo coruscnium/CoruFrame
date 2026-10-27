@@ -25,6 +25,8 @@ CoruFrame is free, non-commercial and not affiliated with Digital Extremes. Thes
 
 These assets are used under Digital Extremes' fan-content policy for a free, non-commercial, unofficial companion. Digital Extremes does not endorse third-party software and is not affiliated with CoruFrame. The files remain Digital Extremes' property and will be removed on request.
 
+The screenshots in [../images/](../images/) are captures of CoruFrame. The Warframe art and game data they show remain Digital Extremes' property under the same notice.
+
 Item names, relic names, drop tables and the market catalog are fetched from public APIs at runtime and are not redistributed. The item database cache (`~/.cache/coruframe/itemdb.json`, built from [WFCD/warframe-items](https://github.com/WFCD/warframe-items)) is generated on the user's machine and is not committed.
 
 ## Lucide

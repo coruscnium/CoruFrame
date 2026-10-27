@@ -6,6 +6,8 @@
 
 A Linux-native Warframe companion: a relic-reward HUD, an inventory ledger, a relic planner and warframe.market tools. Rust, GPL-3.0-only, no telemetry, no server.
 
+![CoruFrame collection browser](docs/images/app-collection.png)
+
 ## Status
 
 Version 1.0.0. The log pipeline, inventory ledger, catalog, price lookup, relic planner, reward OCR and layer-shell HUD work. The desktop app ships Collection, Inventory, Relic Planner, Rivens, Trading and Settings.
@@ -19,6 +21,16 @@ Supported: KDE Plasma Wayland, sway or Hyprland, with the English game UI at 100
 - **Relic planner.** Ranks relics by the value of what they can drop.
 - **Market tools.** Catalog, live prices, orders, presence and Rivens.
 - **Nix.** A flake with NixOS and home-manager modules, pinned GTK, WebKit and Tesseract.
+
+## Screenshots
+
+![Inventory and market value](docs/images/app-inventory.png)
+
+![Relic planner ranked by expected value](docs/images/app-relics.png)
+
+![warframe.market item panel](docs/images/app-market.png)
+
+![Trading orders](docs/images/app-trading.png)
 
 ## Install
 

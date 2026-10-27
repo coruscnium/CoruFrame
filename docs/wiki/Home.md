@@ -6,6 +6,8 @@ A Linux-native Warframe companion: a relic-reward HUD, an inventory ledger, a re
 
 Current release: 1.0.0.
 
+![Collection browser](../images/app-collection.png)
+
 ## Start here
 
 - [Installation](Installation.md): NixOS, home-manager, other distributions and a manual build.
