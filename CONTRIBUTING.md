@@ -4,7 +4,7 @@ Bug reports and patches are welcome. CoruFrame is a local Linux desktop app, so 
 
 ## Before you start
 
-Read the [Compatibility page](docs/wiki/Compatibility.md). The supported setup is narrow: KDE Plasma Wayland (or another `wlr-layer-shell` compositor), the English game UI at 100% scale. A bug on GNOME, X11 or another UI scale is still worth reporting, but it is out of scope for a fix until compatibility work is scheduled.
+Read the [Compatibility page](https://github.com/coruscnium/CoruFrame/wiki/Compatibility). The supported setup is narrow: KDE Plasma Wayland (or another `wlr-layer-shell` compositor), the English game UI at 100% scale. A bug on GNOME, X11 or another UI scale is still worth reporting, but it is out of scope for a fix until compatibility work is scheduled.
 
 Security issues go to [SECURITY.md](SECURITY.md), not a public issue. Never paste a real market token, a wallet entry, or a screenshot containing another player's name.
 
@@ -62,7 +62,7 @@ Any violation of this rule regarding AI assistance will result in a ban, without
 - Keep the diff scoped. A refactor that is not needed for the fix belongs in its own PR.
 - New logic with a branch, loop, parser, money or security gets a small test.
 - When dependencies change, run `cargo audit` (install it with `cargo install cargo-audit`) against both lockfiles and `pnpm audit` locally. New dependencies need a reason; the project prefers the standard library or an existing crate.
-- Update the affected docs in the same change. The user guide lives in `docs/wiki/`; update the page in the same pull request as the code that affects it.
+- Update the affected docs in the same change. The user guide is the GitHub wiki, updated separately from the code and not reviewed in a pull request; contributor and legal records stay in the repository.
 - Verify pull requests on a Nix system. There is deliberately no per-commit CI; local gates and the tag-only release workflow are the checks.
 - Do not commit a token, a wallet entry, a captured frame or a local path.
 
@@ -77,6 +77,6 @@ Releases are cut from a `vX.Y.Z` tag whose version matches all four manifests. T
 Before tagging:
 
 - Add the release date to [CHANGELOG.md](CHANGELOG.md).
-- Re-check the user-guide pages in `docs/wiki/` against the tag.
-- Refresh any screenshots in the README and the user guide when the UI changed.
+- Re-check the published wiki Installation and Usage pages against the tag.
+- Refresh any screenshots in the README and the wiki when the UI changed.
 - Push the tag and confirm the release notes match the curated changelog section.

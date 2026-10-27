@@ -2,7 +2,7 @@
 
 <img src="docs/images/coruframe-icon.png" alt="CoruFrame icon" width="96">
 
-[![Docs](https://img.shields.io/badge/docs-guide-blue)](docs/wiki/Home.md) [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE) [![Platform](https://img.shields.io/badge/platform-Linux-blue)](docs/wiki/Compatibility.md) [![Nix](https://img.shields.io/badge/Nix-flake-blue)](flake.nix)
+[![Docs](https://img.shields.io/badge/docs-wiki-blue)](https://github.com/coruscnium/CoruFrame/wiki) [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE) [![Platform](https://img.shields.io/badge/platform-Linux-blue)](https://github.com/coruscnium/CoruFrame/wiki/Compatibility) [![Nix](https://img.shields.io/badge/Nix-flake-blue)](flake.nix)
 
 A Linux-native Warframe companion: a relic-reward HUD, an inventory ledger, a relic planner and warframe.market tools. Rust, GPL-3.0-only, no telemetry, no server.
 
@@ -66,7 +66,7 @@ nix run github:coruscnium/CoruFrame
 
 `coruframe-app` installs both `coruframe-app` and `coruframe`.
 
-Official support is the Nix flake. Source builds are documented in the [Installation guide](docs/wiki/Installation.md) but are not officially supported; issues are welcome, but try Nix first.
+Official support is the Nix flake. Source builds are documented in the [Installation guide](https://github.com/coruscnium/CoruFrame/wiki/Installation) but are not officially supported; issues are welcome, but try Nix first.
 
 ## Quick start
 
@@ -77,30 +77,30 @@ coruframe catalog update         # build the market catalog
 coruframe-app                    # open the app, then enable the HUD in Settings
 ```
 
-The [Usage guide](docs/wiki/Usage.md) covers the command list, the portal grant and the first run.
+The [Usage guide](https://github.com/coruscnium/CoruFrame/wiki/Usage) covers the command list, the portal grant and the first run.
 
 ## Reward HUD
 
 The probe tails `EE.log`. A `RelicExtraction` line arms it, it captures the portal source you grant once, OCRs each card and draws the panel for 20 seconds. A card is priced only at high OCR confidence; everything else shows `?`.
 
-It needs `wlr-layer-shell`, Tesseract with `eng`, the English UI at 100% scale and a 16:9 frame. [Usage](docs/wiki/Usage.md) explains the toggle and the logs; [Troubleshooting](docs/wiki/Troubleshooting.md) covers a HUD that does not appear.
+It needs `wlr-layer-shell`, Tesseract with `eng`, the English UI at 100% scale and a 16:9 frame. [Usage](https://github.com/coruscnium/CoruFrame/wiki/Usage) explains the toggle and the logs; [Troubleshooting](https://github.com/coruscnium/CoruFrame/wiki/Troubleshooting) covers a HUD that does not appear.
 
 ## Is this safe?
 
-CoruFrame is unofficial and not affiliated with Digital Extremes. It never injects, writes game memory, synthesizes input or modifies game files. The opt-in inventory snapshot is a read-only memory read, off by default and named on its consent screen. DE's policy is that third-party software is used at your own risk; reading `EE.log` is what WFInfo and AlecaFrame have done for years, which is an observation, not a guarantee. [Safety](docs/wiki/Safety.md) has the details.
+CoruFrame is unofficial and not affiliated with Digital Extremes. It never injects, writes game memory, synthesizes input or modifies game files. The opt-in inventory snapshot is a read-only memory read, off by default and named on its consent screen. DE's policy is that third-party software is used at your own risk; reading `EE.log` is what WFInfo and AlecaFrame have done for years, which is an observation, not a guarantee. [Safety](https://github.com/coruscnium/CoruFrame/wiki/Safety) has the details.
 
 ## Documentation
 
-User guide:
+The [user guide](https://github.com/coruscnium/CoruFrame/wiki) is on the GitHub wiki:
 
-- [Installation](docs/wiki/Installation.md)
-- [Usage](docs/wiki/Usage.md)
-- [Compatibility](docs/wiki/Compatibility.md)
-- [Safety](docs/wiki/Safety.md)
-- [Market-account](docs/wiki/Market-account.md)
-- [Data-and-privacy](docs/wiki/Data-and-privacy.md)
-- [Troubleshooting](docs/wiki/Troubleshooting.md)
-- [Development](docs/wiki/Development.md): contributor entry point
+- [Installation](https://github.com/coruscnium/CoruFrame/wiki/Installation)
+- [Usage](https://github.com/coruscnium/CoruFrame/wiki/Usage)
+- [Compatibility](https://github.com/coruscnium/CoruFrame/wiki/Compatibility)
+- [Safety](https://github.com/coruscnium/CoruFrame/wiki/Safety)
+- [Market-account](https://github.com/coruscnium/CoruFrame/wiki/Market-account)
+- [Data-and-privacy](https://github.com/coruscnium/CoruFrame/wiki/Data-and-privacy)
+- [Troubleshooting](https://github.com/coruscnium/CoruFrame/wiki/Troubleshooting)
+- [Development](https://github.com/coruscnium/CoruFrame/wiki/Development): contributor entry point
 
 Developer and legal records:
 

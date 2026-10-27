@@ -20,4 +20,4 @@ body:
     attributes:
       label: Compatibility
       description: |
-        Name your session, compositor and UI scale. The supported setup is a KDE Plasma Wayland session with the English UI at 100%. See https://github.com/coruscnium/CoruFrame/blob/main/docs/wiki/Compatibility.md before assuming a different setup is supported.
+        Name your session, compositor and UI scale. The supported setup is a KDE Plasma Wayland session with the English UI at 100%. See https://github.com/coruscnium/CoruFrame/wiki/Compatibility before assuming a different setup is supported.

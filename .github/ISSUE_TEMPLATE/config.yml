@@ -4,8 +4,8 @@ contact_links:
     url: https://github.com/coruscnium/CoruFrame/security/advisories/new
     about: Report a vulnerability privately. Do not open a public issue.
   - name: Troubleshooting
-    url: https://github.com/coruscnium/CoruFrame/blob/main/docs/wiki/Troubleshooting.md
+    url: https://github.com/coruscnium/CoruFrame/wiki/Troubleshooting
     about: Check the common problems before filing a bug.
   - name: Compatibility
-    url: https://github.com/coruscnium/CoruFrame/blob/main/docs/wiki/Compatibility.md
+    url: https://github.com/coruscnium/CoruFrame/wiki/Compatibility
     about: Confirm whether your session and compositor are supported.
