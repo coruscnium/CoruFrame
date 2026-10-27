@@ -2,17 +2,11 @@
 
 <img src="docs/images/coruframe-icon.png" alt="CoruFrame icon" width="96">
 
-[![Docs](https://img.shields.io/badge/docs-guide-blue)](docs/wiki/Home.md) [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE) [![Platform](https://img.shields.io/badge/platform-Linux-blue)](#status) [![Nix](https://img.shields.io/badge/Nix-flake-blue)](flake.nix)
+[![Docs](https://img.shields.io/badge/docs-guide-blue)](docs/wiki/Home.md) [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue)](LICENSE) [![Platform](https://img.shields.io/badge/platform-Linux-blue)](docs/wiki/Compatibility.md) [![Nix](https://img.shields.io/badge/Nix-flake-blue)](flake.nix)
 
 A Linux-native Warframe companion: a relic-reward HUD, an inventory ledger, a relic planner and warframe.market tools. Rust, GPL-3.0-only, no telemetry, no server.
 
 ![CoruFrame collection browser](docs/images/app-collection.png)
-
-## Status
-
-Version 1.0.0. The log pipeline, inventory ledger, catalog, price lookup, relic planner, reward OCR and layer-shell HUD work. The desktop app ships Collection, Inventory, Relic Planner, Rivens, Trading and Settings.
-
-Supported: KDE Plasma Wayland, sway or Hyprland, with the English game UI at 100% scale. GNOME, X11 and XWayland get no HUD. The full matrix is in [Compatibility](docs/wiki/Compatibility.md).
 
 ## Features
 
