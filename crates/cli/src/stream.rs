@@ -129,7 +129,9 @@ pub fn capture_one(fd: OwnedFd, node_id: u32) -> Result<CapturedFrame> {
 
     let deadline = Instant::now() + FRAME_TIMEOUT;
     while Instant::now() < deadline {
-        mainloop.loop_().iterate(Duration::from_millis(50));
+        mainloop
+            .loop_()
+            .iterate(pw::loop_::Timeout::Finite(Duration::from_millis(50)));
         if slot.lock().map(|slot| slot.is_some()).unwrap_or(true) {
             break;
         }

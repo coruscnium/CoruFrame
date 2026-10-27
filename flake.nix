@@ -75,7 +75,7 @@
           pnpm = pkgs.pnpm_10;
           postPatch = "cd app";
           fetcherVersion = 4;
-          hash = "sha256-NzRFvj/dv/UmTTP08aONTLF2BJw1NVJ1xbjWP95CPS8=";
+          hash = "sha256-saCWM7cbtb2NIj5CGr+46Y8AHDsLBexpzZclMuSqeZE=";
         };
 
         cargoRoot = "app/src-tauri";

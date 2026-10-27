@@ -24,5 +24,5 @@ tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 url = "2"
 wait-timeout = "0.2"
 image = { version = "0.25", default-features = false, features = ["png"] }
-zbus = "6"
+zbus = "5"
 memchr = "2"
