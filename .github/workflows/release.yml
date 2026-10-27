@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  XDG_CONFIG_HOME: ${{ github.workspace }}/.ci/config
+  XDG_CACHE_HOME: ${{ github.workspace }}/.ci/cache
+  XDG_DATA_HOME: ${{ github.workspace }}/.ci/data
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: The tag names the built version
+        run: node scripts/version-check.mjs --tag "$GITHUB_REF_NAME"
+      - name: Tests
+        run: |
+          nix develop -c bash -c '
+            cargo test --workspace
+            cd app/src-tauri
+            cargo test
+          '
+      - name: Build the app package
+        run: nix build .# -L
+      - name: Verify the install layout
+        run: |
+          test -x result/bin/coruframe-app
+          test -f result/share/applications/coruframe-app.desktop
+          grep -q '^Exec=/nix/store/.*/bin/coruframe-app$' result/share/applications/coruframe-app.desktop
+          grep -q '^Icon=/nix/store/.*/share/icons/hicolor/512x512/apps/coruframe-app.png$' result/share/applications/coruframe-app.desktop
+          test -f result/share/icons/hicolor/512x512/apps/coruframe-app.png
+      - name: Extract release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '$0 ~ "^## " v " " {flag=1; next} /^## / {if(flag) exit} flag' CHANGELOG.md > /tmp/notes.md
+          test -s /tmp/notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "CoruFrame $GITHUB_REF_NAME" \
+            --notes-file /tmp/notes.md

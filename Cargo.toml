@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/cli"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+license = "GPL-3.0-only"
+rust-version = "1.90"
+description = "Relic-reward HUD, inventory ledger and market tooling for Warframe"
+readme = "README.md"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+
+# Card matching runs the whole catalog through edit distance; unoptimized that
+# takes ~16 s for one frame, which does not fit the 20 s reward window.
+[profile.dev]
+opt-level = 2

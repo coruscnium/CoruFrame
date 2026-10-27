@@ -1,0 +1,26 @@
+target
+result*
+.direnv
+node_modules
+dist
+.vite
+
+# Local packaging artifacts: binaries, staged models, bundles.
+app/src-tauri/binaries/
+app/src-tauri/resources/
+*.AppImage
+*.deb
+*.rpm
+
+# OCR corpus frames are local-only (screenshots may contain player names).
+crates/cli/tests/ocr/*.png
+crates/cli/tests/ocr/*.jpg
+
+# Tauri regenerates the ACL schemas on every build.
+app/src-tauri/gen/schemas/
+
+# Never commit credentials or local captures.
+.env
+.env.*
+*.token
+market-token

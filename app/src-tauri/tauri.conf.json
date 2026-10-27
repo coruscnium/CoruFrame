@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CoruFrame",
+  "version": "1.0.0",
+  "identifier": "xyz.coruscnium.coruframe",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "CoruFrame",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "theme": "Dark",
+        "visible": true,
+        "backgroundColor": "#08090a"
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "img-src": "'self' data: blob: https://warframe.market https://cdn.warframestat.us https://raw.githubusercontent.com",
+        "style-src": "'self'",
+        "script-src": "'self'",
+        "font-src": "'self'",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "frame-ancestors": "'none'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost ws://127.0.0.1:1420 ws://localhost:1420",
+        "img-src": "'self' data: blob: https://warframe.market https://cdn.warframestat.us https://raw.githubusercontent.com",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'",
+        "font-src": "'self'",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "frame-ancestors": "'none'",
+        "form-action": "'none'"
+      }
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/icon.png"
+    ],
+    "category": "Utility",
+    "shortDescription": "Linux-native Warframe companion",
+    "longDescription": "Relic-reward HUD, inventory ledger, relic planner and warframe.market integration. Local data, no telemetry.",
+    "license": "GPL-3.0-only"
+  }
+}

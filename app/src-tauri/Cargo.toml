@@ -1,0 +1,33 @@
+[package]
+name = "coruframe-app"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.90"
+license = "GPL-3.0-only"
+description = "CoruFrame desktop app: inventory ledger, relic planner and HUD settings"
+readme = "../../README.md"
+
+[workspace]
+
+# The root workspace profile does not apply here: app/src-tauri is its own
+# workspace. Debug builds run the catalog and snapshot work unoptimized.
+[profile.dev]
+opt-level = 2
+
+[lib]
+name = "coruframe_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+coruframe-core = { path = "../../crates/core" }
+tungstenite = { version = "0.30.0", features = ["rustls-tls-webpki-roots", "url"] }
+url = "2"
+keyring = { version = "4", features = ["v1"] }
+libc = "0.2"
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }

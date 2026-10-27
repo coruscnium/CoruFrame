@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "frames": [
+    {
+      "file": "wfinfo-1.png",
+      "width": 1920,
+      "height": 1080,
+      "ui_scale": 100,
+      "language": "en",
+      "game_version": "reference",
+      "source": "reference:github.com/soranew/wfinfo-linux",
+      "expected": [
+        "Octavia Prime Systems Blueprint",
+        "Octavia Prime Blueprint",
+        "Tenora Prime Blueprint",
+        "Harrow Prime Systems Blueprint"
+      ],
+      "notes": "two-line names; 1920x1080 reference"
+    },
+    {
+      "file": "wfinfo-2.png",
+      "width": 3440,
+      "height": 1440,
+      "ui_scale": 100,
+      "language": "en",
+      "game_version": "reference",
+      "source": "reference:github.com/soranew/wfinfo-linux",
+      "expected": [
+        "Hildryn Prime Systems Blueprint",
+        "Forma Blueprint",
+        "Braton Prime Barrel",
+        "Paris Prime Lower Limb"
+      ],
+      "notes": "Forma card has no market entry; 3440x1440 reference"
+    },
+    {
+      "file": "wfinfo-3.png",
+      "width": 3440,
+      "height": 1440,
+      "ui_scale": 100,
+      "language": "en",
+      "game_version": "reference",
+      "source": "reference:github.com/soranew/wfinfo-linux",
+      "expected": [
+        "Larkspur Prime Receiver",
+        "Phantasma Prime Blueprint",
+        "Protea Prime Neuroptics Blueprint",
+        "Forma Blueprint"
+      ],
+      "notes": "ligature in the Phantasma card; blue and gold names"
+    },
+    {
+      "file": "wfinfo-4.png",
+      "width": 3440,
+      "height": 1440,
+      "ui_scale": 100,
+      "language": "en",
+      "game_version": "reference",
+      "source": "reference:github.com/soranew/wfinfo-linux",
+      "expected": [
+        "Forma Blueprint",
+        "Wisp Prime Neuroptics Blueprint",
+        "Shade Prime Carapace",
+        "Burston Prime Receiver"
+      ],
+      "notes": "companion part card"
+    },
+    {
+      "file": "wfinfo-reward.png",
+      "width": 3440,
+      "height": 1440,
+      "ui_scale": 100,
+      "language": "en",
+      "game_version": "reference",
+      "source": "reference:github.com/soranew/wfinfo-linux",
+      "expected": [
+        "Hildryn Prime Systems Blueprint",
+        "Forma Blueprint",
+        "Braton Prime Barrel",
+        "Paris Prime Lower Limb"
+      ],
+      "notes": "second capture of the same reward screen"
+    }
+  ]
+}
