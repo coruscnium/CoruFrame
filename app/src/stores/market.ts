@@ -76,11 +76,12 @@ export function defaultFilter(item: MarketItemDto): OrderFilter {
 function loadTracked(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
+    // An empty saved list means the user untracked everything; only a missing
+    // key is a fresh install that gets the seed.
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const slugs = parsed.filter((value): value is string => typeof value === "string");
-        if (slugs.length) return slugs;
+        return parsed.filter((value): value is string => typeof value === "string");
       }
     }
   } catch {
