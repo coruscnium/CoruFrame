@@ -21,6 +21,8 @@ struct Doc<T> {
 struct Lang {
     #[serde(default)]
     name: String,
+    #[serde(default)]
+    thumb: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Default)]
@@ -31,6 +33,13 @@ struct I18n {
 impl I18n {
     fn name(&self) -> Option<&str> {
         self.en.as_ref().map(|lang| lang.name.as_str())
+    }
+
+    fn thumb(&self) -> Option<&str> {
+        self.en
+            .as_ref()
+            .and_then(|lang| lang.thumb.as_deref())
+            .filter(|thumb| !thumb.is_empty())
     }
 }
 
@@ -75,6 +84,7 @@ pub struct RivenDto {
     pub weapon: Option<String>,
     pub weapon_slug: Option<String>,
     pub weapon_type: Option<String>,
+    pub weapon_thumb: Option<String>,
     pub polarity: String,
     pub rank: u64,
     pub mastery: Option<u64>,
@@ -108,6 +118,7 @@ pub struct RivenListingDto {
     pub name: String,
     pub weapon: Option<String>,
     pub weapon_slug: String,
+    pub weapon_thumb: Option<String>,
     pub rank: Option<u64>,
     pub rerolls: u64,
     pub mastery: Option<u64>,
@@ -565,6 +576,7 @@ pub fn inventory() -> Result<Vec<RivenDto>, String> {
             weapon: weapon_name,
             weapon_slug: weapon.map(|weapon| weapon.slug.clone()),
             weapon_type: display_class,
+            weapon_thumb: weapon.and_then(|weapon| weapon.i18n.thumb().map(str::to_string)),
             polarity: polarity(fingerprint.pol.as_deref()),
             rank: fingerprint.lvl.unwrap_or(0),
             mastery: fingerprint.lvl_req,
@@ -692,6 +704,7 @@ pub fn listings() -> Result<Vec<RivenListingDto>, String> {
             name: auction.item.name,
             weapon: weapon_name,
             weapon_slug: auction.item.weapon_url_name,
+            weapon_thumb: weapon.and_then(|weapon| weapon.i18n.thumb().map(str::to_string)),
             rank: auction.item.mod_rank,
             rerolls: auction.item.re_rolls.unwrap_or(0),
             mastery: auction.item.mastery_level,
@@ -776,6 +789,23 @@ mod tests {
         assert_eq!(polarity(Some("AP_ATTACK")), "Madurai");
         assert_eq!(polarity(Some("AP_DEFENSE")), "Vazarin");
         assert_eq!(polarity(Some("AP_TACTIC")), "Naramon");
+    }
+
+    #[test]
+    fn reads_the_market_weapon_thumb() {
+        let weapon: Weapon = serde_json::from_str(
+            r#"{"slug":"battacor","gameRef":"/Lotus/Weapons/Corpus/LongGuns/CrpSentExperimentRifle/CrpSentExperimentRifle","i18n":{"en":{"name":"Battacor","thumb":"items/images/en/thumbs/battacor.128x128.webp"}}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            weapon.i18n.thumb(),
+            Some("items/images/en/thumbs/battacor.128x128.webp")
+        );
+
+        let without: Weapon =
+            serde_json::from_str(r#"{"slug":"x","gameRef":"/x","i18n":{"en":{"name":"X"}}}"#)
+                .unwrap();
+        assert_eq!(without.i18n.thumb(), None);
     }
 
     #[test]

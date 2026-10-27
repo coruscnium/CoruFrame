@@ -753,6 +753,7 @@ export interface RivenDto {
   weapon: string | null;
   weapon_slug: string | null;
   weapon_type: string | null;
+  weapon_thumb: string | null;
   polarity: string;
   rank: number;
   mastery: number | null;
@@ -782,6 +783,7 @@ export interface RivenListingDto {
   name: string;
   weapon: string | null;
   weapon_slug: string;
+  weapon_thumb: string | null;
   rank: number | null;
   rerolls: number;
   mastery: number | null;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Icon from "../components/Icon.vue";
+import ItemArt from "../components/ItemArt.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PageBar from "../components/PageBar.vue";
 import SearchField from "../components/SearchField.vue";
@@ -15,6 +16,7 @@ import {
 } from "../lib/api";
 import { formatAge, formatPlatinum, formatRank } from "../lib/format";
 import { useCompactTabs } from "../lib/useCompactTabs";
+import { iconUrl } from "../stores/market";
 
 const owned = ref<RivenDto[]>([]);
 const listings = ref<RivenListingDto[]>([]);
@@ -79,6 +81,30 @@ async function refresh() {
 
 function format(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+// `weapon_type` is the WFCD riven class ("Rifle", "Pistol", …); map it to the
+// equipment kind so a missing thumbnail still falls back to the right glyph.
+function weaponKind(type: string | null) {
+  switch (type?.toLowerCase()) {
+    case "rifle":
+    case "shotgun":
+      return "primary";
+    case "pistol":
+    case "kitgun":
+      return "secondary";
+    case "melee":
+    case "zaw":
+      return "melee";
+    case "archgun":
+    case "arch-gun":
+      return "archgun";
+    case "archmelee":
+    case "arch-melee":
+      return "archmelee";
+    default:
+      return "riven";
+  }
 }
 
 function statText(stat: { value: number; unit: string; positive: boolean }) {
@@ -179,7 +205,7 @@ onUnmounted(() => window.removeEventListener("coruframe:refresh", onGlobalRefres
 
       <div class="summary-row">
         <div class="summary-card tone-blue">
-          <span class="summary-icon"><Icon name="rivens" :size="18" /></span>
+          <span class="summary-icon"><WfIcon name="rivens" :size="18" /></span>
           <div><strong>{{ owned.length }}</strong><span>Rivens owned</span></div>
         </div>
         <div class="summary-card tone-green">
@@ -219,7 +245,15 @@ onUnmounted(() => window.removeEventListener("coruframe:refresh", onGlobalRefres
       <div v-else class="riven-grid">
         <article v-for="listing in listings" :key="listing.id" class="riven-card">
           <div class="riven-head">
-            <span class="riven-gem"><Icon name="trading" :size="18" /></span>
+            <span class="riven-gem">
+              <ItemArt
+                v-if="listing.weapon_thumb"
+                :image="iconUrl(listing.weapon_thumb)"
+                kind="riven"
+                :icon-size="18"
+              />
+              <WfIcon v-else name="rivens" :size="18" />
+            </span>
             <div class="riven-title">
               <h3>{{ listing.name }}</h3>
               <span>
@@ -274,7 +308,15 @@ onUnmounted(() => window.removeEventListener("coruframe:refresh", onGlobalRefres
       <div v-else class="riven-grid">
         <article v-for="riven in filteredOwned" :key="riven.id" class="riven-card">
           <div class="riven-head">
-            <span class="riven-gem"><Icon name="rivens" :size="18" /></span>
+            <span class="riven-gem">
+              <ItemArt
+                v-if="!riven.veiled && riven.weapon_thumb"
+                :image="iconUrl(riven.weapon_thumb)"
+                :kind="weaponKind(riven.weapon_type)"
+                :icon-size="18"
+              />
+              <WfIcon v-else name="rivens" :size="18" />
+            </span>
             <div class="riven-title">
               <h3 v-if="riven.veiled">{{ riven.name }}</h3>
               <h3 v-else>

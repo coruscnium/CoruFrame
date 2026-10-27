@@ -98,6 +98,8 @@ export function kindIcon(kind: string | null | undefined): IconName {
       return "sparkles";
     case "relic":
       return "relics";
+    case "riven":
+      return "rivens";
     default:
       return "package";
   }

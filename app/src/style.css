@@ -2382,6 +2382,12 @@ body.dialog-open .workspace {
   color: var(--bronze);
 }
 
+.riven-gem img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .riven-title {
   flex: 1;
   min-width: 0;
