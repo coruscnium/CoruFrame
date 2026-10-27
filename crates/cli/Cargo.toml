@@ -19,10 +19,10 @@ gtk4 = { version = "0.11", features = ["v4_14"] }
 gtk4-layer-shell = "0.8"
 libc = "0.2"
 ashpd = { version = "0.13", features = ["screenshot", "screencast"] }
-pipewire = "0.9"
+pipewire = "0.10"
 tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 url = "2"
 wait-timeout = "0.2"
 image = { version = "0.25", default-features = false, features = ["png"] }
-zbus = "5"
+zbus = "6"
 memchr = "2"
