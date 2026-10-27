@@ -2,6 +2,24 @@
 
 Notable changes per release. Versions follow the git tag (`vX.Y.Z`); the tag and all four manifests must agree, which `scripts/version-check.mjs` enforces.
 
+## 1.0.1 (2026-10-27)
+
+### Added
+
+- CI runs the gates and the Nix package build on every push to `main` and every pull request.
+
+### Changed
+
+- The user guide lives on the GitHub wiki now; the in-repo guide pages were removed and links and issue templates point there.
+- The README has a hero image and app screenshots, and credits p33p4w for the icon art.
+- The sidebar version no longer carries the stale "local only" marker.
+- Nix install examples pin the flake input to a release tag, so users move on releases instead of every commit.
+- Dependency refresh: PipeWire 0.10, Vite 8, vue-router 5, vue-tsc 3 and current GitHub Actions.
+
+### Fixed
+
+- Riven cards show the weapon thumbnail instead of the generic placeholder, and fall back to the Riven symbol for veiled or unknown weapons; the Rivens counter uses the Riven symbol too.
+
 ## 1.0.0 (2026-10-27)
 
 First public release.

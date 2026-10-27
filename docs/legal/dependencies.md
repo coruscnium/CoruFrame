@@ -64,7 +64,6 @@ The license texts are in [LICENSES/](../../LICENSES/), and the asset and data no
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cexpr | 0.6.0 | Apache-2.0/MIT |
 | cfb | 0.14.0 | MIT |
-| cfg_aliases | 0.2.2 | MIT |
 | cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
 | cfg-expr | 0.20.10 | MIT OR Apache-2.0 |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 |
@@ -76,14 +75,13 @@ The license texts are in [LICENSES/](../../LICENSES/), and the asset and data no
 | combine | 4.6.9 | MIT |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
 | const-oid | 0.10.2 | Apache-2.0 OR MIT |
-| convert_case | 0.8.0 | MIT |
 | cookie | 0.18.2 | MIT OR Apache-2.0 |
 | cookie-factory | 0.3.3 | MIT |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
 | core-graphics | 0.25.0 | MIT OR Apache-2.0 |
 | core-graphics-types | 0.2.0 | MIT OR Apache-2.0 |
-| coruframe-core | 1.0.0 | GPL-3.0-only |
+| coruframe-core | 1.0.1 | GPL-3.0-only |
 | cpubits | 0.1.1 | MIT OR Apache-2.0 |
 | cpufeatures | 0.2.17 | MIT OR Apache-2.0 |
 | cpufeatures | 0.3.1 | MIT OR Apache-2.0 |
@@ -260,8 +258,8 @@ The license texts are in [LICENSES/](../../LICENSES/), and the asset and data no
 | libloading | 0.7.4 | ISC |
 | libloading | 0.8.9 | ISC |
 | libredox | 0.1.25 | MIT |
-| libspa | 0.9.2 | MIT |
-| libspa-sys | 0.9.2 | MIT |
+| libspa | 0.10.1 | MIT |
+| libspa-sys | 0.10.1 | MIT |
 | libsqlite3-sys | 0.38.2 | MIT |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | litemap | 0.8.3 | Unicode-3.0 |
@@ -281,7 +279,6 @@ The license texts are in [LICENSES/](../../LICENSES/), and the asset and data no
 | ndk-context | 0.1.1 | MIT OR Apache-2.0 |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
 | new_debug_unreachable | 1.0.6 | MIT |
-| nix | 0.30.1 | MIT |
 | nom | 7.1.3 | MIT |
 | nom | 8.0.0 | MIT |
 | num | 0.4.3 | MIT OR Apache-2.0 |
@@ -329,8 +326,8 @@ The license texts are in [LICENSES/](../../LICENSES/), and the asset and data no
 | phf_shared | 0.13.1 | MIT |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | piper | 0.2.5 | MIT OR Apache-2.0 |
-| pipewire | 0.9.2 | MIT |
-| pipewire-sys | 0.9.2 | MIT |
+| pipewire | 0.10.1 | MIT |
+| pipewire-sys | 0.10.1 | MIT |
 | pkg-config | 0.3.34 | MIT OR Apache-2.0 |
 | plist | 1.10.3 | MIT |
 | png | 0.18.1 | MIT OR Apache-2.0 |

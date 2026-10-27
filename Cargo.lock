@@ -339,7 +339,7 @@ checksum = "9885fa71e26b8ab7855e2ec7cae6e9b380edff76cd052e07c683a0319d51b3a2"
 
 [[package]]
 name = "coruframe"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "ashpd",
  "coruframe-core",
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "coruframe-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "libc",
  "rusqlite",

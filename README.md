@@ -36,7 +36,7 @@ The flake exposes `packages`, `overlays.default`, `nixosModules.default` and `ho
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     coruframe = {
-      url = "github:coruscnium/CoruFrame";
+      url = "github:coruscnium/CoruFrame/v1.0.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -60,8 +60,10 @@ The flake exposes `packages`, `overlays.default`, `nixosModules.default` and `ho
 
 For home-manager, import `coruframe.homeManagerModules.default` and set `programs.coruframe.enable = true`.
 
+The input pins a release tag, so `nix flake update` stays on that version until you bump the ref yourself.
+
 ```sh
-nix run github:coruscnium/CoruFrame
+nix run github:coruscnium/CoruFrame/v1.0.1
 ```
 
 `coruframe-app` installs both `coruframe-app` and `coruframe`.

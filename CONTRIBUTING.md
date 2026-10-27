@@ -77,6 +77,7 @@ Releases are cut from a `vX.Y.Z` tag whose version matches all four manifests. T
 Before tagging:
 
 - Add the release date to [CHANGELOG.md](CHANGELOG.md).
+- Bump the flake input and `nix run` refs in [README.md](README.md) to the new tag.
 - Re-check the published wiki Installation and Usage pages against the tag.
 - Refresh any screenshots in the README and the wiki when the UI changed.
 - Push the tag and confirm the release notes match the curated changelog section.
