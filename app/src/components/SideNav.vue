@@ -305,6 +305,6 @@ onMounted(() => {
         <span class="nav-short">SET</span>
       </RouterLink>
     </nav>
-    <div class="sidebar-version">v{{ version }} · local only</div>
+    <div class="sidebar-version">v{{ version }}</div>
   </aside>
 </template>
