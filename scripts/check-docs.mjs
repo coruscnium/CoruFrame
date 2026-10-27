@@ -33,7 +33,6 @@ function lineAt(text, index) {
   return line;
 }
 
-// The user guide lives in the GitHub wiki; only repository Markdown is checked.
 const docs = markdownFiles(resolve(root, "docs"));
 const files = [
   ...topLevel.map((name) => resolve(root, name)),

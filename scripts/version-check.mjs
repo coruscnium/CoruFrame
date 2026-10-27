@@ -44,8 +44,7 @@ if (pkg.name !== "coruframe-app") {
   throw new Error(`package name is ${pkg.name}`);
 }
 
-// A release tag must describe exactly the manifests that were built. Called as
-// `node scripts/version-check.mjs --tag v1.0.0` from the release workflow.
+// Called as `node scripts/version-check.mjs --tag v1.0.0` from the release workflow.
 const tagIndex = process.argv.indexOf("--tag");
 const tag = tagIndex === -1 ? undefined : process.argv[tagIndex + 1];
 const version = [...unique][0];

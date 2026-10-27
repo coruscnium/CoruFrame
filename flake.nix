@@ -107,19 +107,15 @@
 
         env.OPENSSL_NO_VENDOR = 1;
 
-        # `nix profile install .#` must provide the CLI too: the app spawns it
-        # for the HUD and the README tells people to run `coruframe doctor`.
-        # The Tauri hook writes a relative Exec=; make it absolute so launching
-        # from a desktop session does not depend on the session's PATH. The
-        # panel failed to resolve the themed icon name, so point Icon at the
-        # installed PNG directly.
+        # The app spawns the CLI for the HUD; install it alongside.
+        # The hook writes a relative Exec= and a themed icon name; both need to
+        # be absolute because PATH and icon lookup are unreliable from an entry.
         postInstall = ''
           ln -s ${cli}/bin/coruframe $out/bin/coruframe
           substituteInPlace $out/share/applications/CoruFrame.desktop \
             --replace-fail "Exec=coruframe-app" "Exec=$out/bin/coruframe-app" \
             --replace-fail "Icon=coruframe-app" "Icon=$out/share/icons/hicolor/512x512/apps/coruframe-app.png"
-          # KWin resolves the taskbar icon from the Wayland app_id, which is the
-          # binary name, so the entry must be named after it.
+          # KWin matches the taskbar icon by Wayland app_id, which is the binary name.
           mv $out/share/applications/CoruFrame.desktop $out/share/applications/coruframe-app.desktop
         '';
 
@@ -229,8 +225,6 @@
       homeManagerModules.default = coruframeHomeModule;
 
       devShells.${system}.default = pkgs.mkShell {
-        # devshell `out` points inside this repo; stdenv would add it as an rpath, and the
-        # space in "AI Folder" then splits NIX_LDFLAGS and breaks every link.
         NIX_NO_SELF_RPATH = "1";
         # The pipewire crate builds its bindings with bindgen.
         LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
