@@ -117,3 +117,5 @@ Bug reports and patches are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers t
 GPL-3.0-only, except the Warframe art and game data in `app/src/assets/wf/`, `crates/cli/assets/` and `app/src-tauri/data/riven-base.json`, which stay Digital Extremes' property and are excluded from the GPL grant. See [docs/legal/assets.md](docs/legal/assets.md) for the provenance and the non-commercial fan-content notice, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for everything else.
 
 CoruFrame is not affiliated with Digital Extremes.
+
+Icon art by p33p4w.

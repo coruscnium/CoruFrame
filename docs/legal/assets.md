@@ -4,7 +4,7 @@ Everything in this file is excluded from the GPL-3.0 grant that covers the CoruF
 
 ## CoruFrame icon
 
-`app/src-tauri/icons/icon.png` and [coruframe-icon.png](../images/coruframe-icon.png) are original CoruFrame project artwork, licensed under GPL-3.0-only like the source. They are not third-party assets.
+`app/src-tauri/icons/icon.png` and [coruframe-icon.png](../images/coruframe-icon.png) are original CoruFrame artwork by p33p4w, licensed under GPL-3.0-only like the source. They are not third-party assets.
 
 ## Warframe art and data
 
