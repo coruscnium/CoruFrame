@@ -63,7 +63,7 @@ Any violation of this rule regarding AI assistance will result in a ban, without
 - New logic with a branch, loop, parser, money or security gets a small test.
 - When dependencies change, run `cargo audit` (install it with `cargo install cargo-audit`) against both lockfiles and `pnpm audit` locally. New dependencies need a reason; the project prefers the standard library or an existing crate.
 - Update the affected docs in the same change. The user guide is the GitHub wiki, updated separately from the code and not reviewed in a pull request; contributor and legal records stay in the repository.
-- Verify pull requests on a Nix system. There is deliberately no per-commit CI; local gates and the tag-only release workflow are the checks.
+- CI runs the gates above plus the Nix package build on every push to `main` and every pull request. The tag-only release workflow builds and publishes the release.
 - Do not commit a token, a wallet entry, a captured frame or a local path.
 
 ## Commit authorship

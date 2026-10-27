@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XDG_CONFIG_HOME: ${{ github.workspace }}/.ci/config
+  XDG_CACHE_HOME: ${{ github.workspace }}/.ci/cache
+  XDG_DATA_HOME: ${{ github.workspace }}/.ci/data
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Rust gates
+        run: |
+          nix develop -c bash -euo pipefail -c '
+            cargo fmt --all -- --check
+            cargo clippy --workspace --all-targets -- -D warnings
+            cargo test --workspace
+            cd app/src-tauri
+            cargo fmt --all -- --check
+            cargo clippy --all-targets -- -D warnings
+            cargo test
+          '
+      - name: Frontend and repository gates
+        run: |
+          nix develop -c bash -euo pipefail -c '
+            cd app
+            pnpm install --frozen-lockfile
+            pnpm build
+            cd ..
+            node scripts/ui-audit.mjs
+            node scripts/check-docs.mjs
+            node scripts/version-check.mjs
+          '
+      - name: Build the Nix package
+        run: nix build .# -L

@@ -8,6 +8,10 @@ updates:
     groups:
       rust-dependencies:
         patterns: ["*"]
+    ignore:
+      # zbus 6 dropped the blocking API the CLI is built on.
+      - dependency-name: "zbus"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: cargo
     directory: /app/src-tauri
@@ -26,6 +30,10 @@ updates:
     groups:
       frontend-dependencies:
         patterns: ["*"]
+    ignore:
+      # vue-tsc 3.3.x cannot load the TypeScript 7 native compiler.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
