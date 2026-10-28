@@ -78,8 +78,9 @@ pub enum Event {
         player_id: String,
         game_ref: String,
     },
-    // `AddSquadMember: <name>, mm=..., squadCount=N` fixes how many reward
-    // cards the screen will show before any image work happens.
+    // `AddSquadMember: <name>, mm=..., squadCount=N` is the squad size, an
+    // upper bound on the reward cards: a player whose relic fails to crack
+    // stays in the squad but gets no card.
     SquadSize {
         line: u64,
         ts_ms: u64,

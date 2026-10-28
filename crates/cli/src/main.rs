@@ -546,6 +546,12 @@ struct Scan {
     geometry: reward::GeometrySource,
 }
 
+#[derive(Clone, Copy)]
+struct RowGeometry {
+    top: Option<u32>,
+    source: reward::GeometrySource,
+}
+
 fn match_text<'a>(
     catalog: &'a catalog::Catalog,
     text: &str,
@@ -684,64 +690,55 @@ fn scan_image(
         }
         _ => (None, reward::GeometrySource::Fixed),
     };
-
-    let order: Vec<u32> = match hint {
-        Some(count) if (1..=4).contains(&count) => vec![count],
-        _ => reward::LAYOUTS.to_vec(),
+    let row = RowGeometry {
+        top: detected,
+        source,
     };
-
     let started = Instant::now();
+    match hint {
+        Some(count) if (1..=4).contains(&count) => {
+            scan_hinted(catalog, image, pools, crop_dir, count, row, started)
+        }
+        _ => scan_unhinted(catalog, image, pools, crop_dir, row, started),
+    }
+}
+
+// No squad hint: score every layout as before. This is the path used by
+// `probe --image` and the existing OCR corpus.
+fn scan_unhinted(
+    catalog: &catalog::Catalog,
+    image: &image::RgbImage,
+    pools: &Pools,
+    crop_dir: &Path,
+    row: RowGeometry,
+    started: Instant,
+) -> std::result::Result<Scan, String> {
     let mut best: Option<(f32, Scan)> = None;
-    for cards in order {
+    for cards in reward::LAYOUTS {
         if started.elapsed() >= OCR_BUDGET {
             break;
         }
-        let crops = reward::layout_image_with_top(image, cards, crop_dir, detected)?;
-        let mut scanned: Vec<CardScan> = crops
-            .into_iter()
-            .map(|crop| {
-                let (chosen, confidence) = match_crop(catalog, &crop, pools);
-                CardScan {
-                    crop,
-                    chosen,
-                    confidence,
-                }
-            })
-            .collect();
+        let mut scan = Scan {
+            cards: scan_layout_luma(catalog, image, pools, crop_dir, cards, row.top)?,
+            geometry: row.source,
+        };
         // Only the four-card first pass gets the extra variants, and only for
         // cards that did not reach the high tier.
-        if cards == hint.unwrap_or(4) {
-            for card in &mut scanned {
-                if card.confidence.tier == ConfidenceTier::High || started.elapsed() >= OCR_BUDGET {
-                    continue;
-                }
-                let extras = reward::reocr_image(&card.crop, crop_dir);
-                if extras.is_empty() {
-                    continue;
-                }
-                card.crop.texts.extend(extras);
-                let (chosen, confidence) = match_crop(catalog, &card.crop, pools);
-                card.chosen = chosen;
-                card.confidence = confidence;
-            }
+        if cards == 4 {
+            rescue_layout(&mut scan, catalog, pools, crop_dir, started);
         }
-        let chosen = scanned.iter().filter(|card| card.chosen.is_some()).count();
-        let unknown = scanned.len().saturating_sub(chosen);
-        let score = scanned
+        let chosen = scan
+            .cards
+            .iter()
+            .filter(|card| card.chosen.is_some())
+            .count();
+        let unknown = scan.cards.len().saturating_sub(chosen);
+        let score = scan
+            .cards
             .iter()
             .filter_map(|card| card.chosen.as_ref().map(|_| card.confidence.score))
             .sum::<f32>()
             - 1.5 * unknown as f32;
-        let scan = Scan {
-            cards: scanned,
-            geometry: source,
-        };
-        // The log says how many players are in the squad, so the hinted count is
-        // authoritative even when every card is unknown. Trying a smaller layout
-        // here would drop a visible card.
-        if hint.is_some() {
-            return Ok(scan);
-        }
         if cards == 4 && chosen >= 3 {
             return Ok(scan);
         }
@@ -761,8 +758,96 @@ fn scan_image(
     }
     Ok(best.map(|(_, scan)| scan).unwrap_or(Scan {
         cards: Vec::new(),
-        geometry: source,
+        geometry: row.source,
     }))
+}
+
+// Squad size is an upper bound. The frame decides the row: the hinted layout
+// wins when every card is high, a smaller layout wins when every card in it is
+// high, and a smaller layout that is a centered subset of the hint also needs
+// its outer cells to be visually empty. If nothing is fully readable, keep the
+// hinted count so a visible card is never dropped.
+fn scan_hinted(
+    catalog: &catalog::Catalog,
+    image: &image::RgbImage,
+    pools: &Pools,
+    crop_dir: &Path,
+    hint: u32,
+    row: RowGeometry,
+    started: Instant,
+) -> std::result::Result<Scan, String> {
+    let top = row.top.unwrap_or_else(|| reward::fixed_top(image.height()));
+    let mut hinted = Scan {
+        cards: scan_layout_luma(catalog, image, pools, crop_dir, hint, row.top)?,
+        geometry: row.source,
+    };
+    if scan_complete(&hinted, None) {
+        return Ok(hinted);
+    }
+    for cards in (1..hint).rev() {
+        if started.elapsed() >= OCR_BUDGET {
+            break;
+        }
+        let scan = Scan {
+            cards: scan_layout_luma(catalog, image, pools, crop_dir, cards, row.top)?,
+            geometry: row.source,
+        };
+        if !scan_complete(&scan, None) {
+            continue;
+        }
+        if reward::is_centered_subset(hint, cards)
+            && !reward::extra_cells_absent(image, hint, cards, top)
+        {
+            continue;
+        }
+        return Ok(scan);
+    }
+    rescue_layout(&mut hinted, catalog, pools, crop_dir, started);
+    Ok(hinted)
+}
+
+fn scan_layout_luma(
+    catalog: &catalog::Catalog,
+    image: &image::RgbImage,
+    pools: &Pools,
+    crop_dir: &Path,
+    cards: u32,
+    detected: Option<u32>,
+) -> std::result::Result<Vec<CardScan>, String> {
+    let crops = reward::layout_image_with_top(image, cards, crop_dir, detected)?;
+    Ok(crops
+        .into_iter()
+        .map(|crop| {
+            let (chosen, confidence) = match_crop(catalog, &crop, pools);
+            CardScan {
+                crop,
+                chosen,
+                confidence,
+            }
+        })
+        .collect())
+}
+
+fn rescue_layout(
+    scan: &mut Scan,
+    catalog: &catalog::Catalog,
+    pools: &Pools,
+    crop_dir: &Path,
+    started: Instant,
+) {
+    for card in &mut scan.cards {
+        if card.confidence.tier == ConfidenceTier::High || started.elapsed() >= OCR_BUDGET {
+            continue;
+        }
+        let extras = reward::reocr_image(&card.crop, crop_dir);
+        if extras.is_empty() {
+            continue;
+        }
+        card.crop.texts.extend(extras);
+        let (chosen, confidence) = match_crop(catalog, &card.crop, pools);
+        card.chosen = chosen;
+        card.confidence = confidence;
+    }
 }
 
 fn crop_dir() -> PathBuf {
@@ -781,8 +866,9 @@ fn scan_path(
     scan_image(catalog, &image, pools, &crop_dir(), hint)
 }
 
-// The early (4 s) capture may open the HUD only when the full expected squad
-// is already readable. The 5 s retry accepts unknown cards with their evidence.
+// The early (4 s) capture may open the HUD only when a whole row is readable:
+// the hinted count when every expected card is high, or a smaller centered row
+// when every card in it is high. The retry accepts unknown cards with evidence.
 fn scan_complete(scan: &Scan, hint: Option<u32>) -> bool {
     let expected = hint.map_or(scan.cards.len(), |count| count as usize);
     !scan.cards.is_empty()
@@ -791,6 +877,10 @@ fn scan_complete(scan: &Scan, hint: Option<u32>) -> bool {
             .cards
             .iter()
             .all(|card| card.chosen.is_some() && card.confidence.tier == ConfidenceTier::High)
+}
+
+fn first_capture_readable(scan: &Scan, hint: Option<u32>) -> bool {
+    scan_complete(scan, hint) || scan_complete(scan, None)
 }
 
 fn hud_capture(
@@ -818,7 +908,7 @@ fn hud_capture(
     if scan.cards.is_empty() {
         return Ok(None);
     }
-    if strict && !scan_complete(&scan, hint) {
+    if strict && !first_capture_readable(&scan, hint) {
         eprintln!("hud: early capture incomplete; retrying");
         return Ok(None);
     }
@@ -2045,6 +2135,15 @@ mod tests {
         assert!(scan_complete(&scan(&[true]), None));
         assert!(!scan_complete(&scan(&[false]), None));
         assert!(!scan_complete(&scan(&[]), None));
+        assert!(first_capture_readable(&scan(&[true, true, true]), Some(4)));
+        assert!(!first_capture_readable(
+            &scan(&[true, true, false]),
+            Some(4)
+        ));
+        assert!(first_capture_readable(
+            &scan(&[true, true, true, true]),
+            Some(4)
+        ));
     }
 
     #[test]

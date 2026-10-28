@@ -37,6 +37,10 @@ struct Frame {
     pub game_version: String,
     #[serde(default)]
     pub source: String,
+    /// Squad size for the hinted layout path. Omitted frames keep the old
+    /// no-hint scoring path.
+    #[serde(default)]
+    pub squad: Option<u32>,
     pub expected: Vec<String>,
     #[serde(default)]
     pub notes: String,
@@ -237,7 +241,7 @@ fn evaluate_frame(
         }
     }
     let started = Instant::now();
-    let scan = crate::scan_image(catalog, &image, pools, &crate::crop_dir(), None)?;
+    let scan = crate::scan_image(catalog, &image, pools, &crate::crop_dir(), frame.squad)?;
     let latency_ms = started.elapsed().as_millis();
 
     let mut cards = Vec::new();

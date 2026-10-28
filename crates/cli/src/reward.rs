@@ -231,6 +231,135 @@ fn luma_image_pixel(image: &RgbImage, x: u32, y: u32) -> u8 {
     luma(r, g, b) as u8
 }
 
+// A centered smaller row is an exact subset of the larger row for the same
+// parity: 2 is the middle of 4, 1 is the middle of 3. A fully readable subset
+// therefore cannot prove that the outer cards are absent.
+pub fn is_centered_subset(hint: u32, cards: u32) -> bool {
+    cards < hint && (hint - cards).is_multiple_of(2)
+}
+
+// Used only to arbitrate a centered subset. The check is deliberately biased
+// towards "present": a busy background may keep the larger layout, but a real
+// outer card is never dropped because its name was unreadable.
+pub fn extra_cells_absent(image: &RgbImage, hint: u32, cards: u32, top: u32) -> bool {
+    if !is_centered_subset(hint, cards) {
+        return false;
+    }
+    let (width, height) = image.dimensions();
+    let Some((left, _, card_width, card_height)) = geometry(width, height, hint) else {
+        return false;
+    };
+    if card_width == 0 || card_height == 0 {
+        return false;
+    }
+    let offset = (hint - cards) / 2;
+    let known: Vec<f32> = (0..cards)
+        .map(|index| {
+            cell_edge_score(
+                image,
+                left + (offset + index) * card_width,
+                top,
+                card_width,
+                card_height,
+            )
+        })
+        .collect();
+    let card_ref = median(known);
+    let mut empty = Vec::new();
+    let left_width = left.min(card_width);
+    if left_width * 2 >= card_width {
+        empty.push(cell_edge_score(
+            image,
+            left - left_width,
+            top,
+            left_width,
+            card_height,
+        ));
+    }
+    let right_start = left + hint * card_width;
+    let right_width = width.saturating_sub(right_start).min(card_width);
+    if right_width * 2 >= card_width {
+        empty.push(cell_edge_score(
+            image,
+            right_start,
+            top,
+            right_width,
+            card_height,
+        ));
+    }
+    if empty.is_empty() {
+        return false;
+    }
+    let empty_ref = median(empty);
+    let spread = card_ref - empty_ref;
+    if spread < 0.10 {
+        return false;
+    }
+    let absent_limit = empty_ref + spread * 0.30;
+    (0..offset).chain(offset + cards..hint).all(|index| {
+        cell_edge_score(
+            image,
+            left + index * card_width,
+            top,
+            card_width,
+            card_height,
+        ) < absent_limit
+    })
+}
+
+// Fraction of columns in the card art band with a visible vertical edge. A full
+// card art and name plate score high, half a card scores around half, and empty
+// background scores low. The caller compares against the row's own card and
+// margin scores, so no absolute brightness assumption is needed.
+fn cell_edge_score(image: &RgbImage, left: u32, top: u32, width: u32, height: u32) -> f32 {
+    const BAND: f64 = 0.80;
+    // Calibrated on the local corpus: full cards score 0.41-0.74, half cards
+    // around 0.31, and the background margins 0.00-0.08. The strict threshold
+    // used earlier collapsed full and half cards into the same range.
+    const EDGE: u8 = 8;
+    let (image_width, image_height) = image.dimensions();
+    if width < 3 || left >= image_width || top >= image_height {
+        return 0.0;
+    }
+    let band = ((height as f64 * BAND) as u32).clamp(1, height);
+    let bottom = (top + band).min(image_height);
+    if bottom <= top {
+        return 0.0;
+    }
+    let start = left.max(1);
+    let end = (left + width).min(image_width.saturating_sub(1));
+    if end <= start {
+        return 0.0;
+    }
+    let mut edges = 0u32;
+    let mut columns = 0u32;
+    for x in start..end {
+        let mut sum = 0u64;
+        for y in top..bottom {
+            let a = luma_image_pixel(image, x - 1, y);
+            let b = luma_image_pixel(image, x + 1, y);
+            sum += a.abs_diff(b) as u64;
+        }
+        if sum / (bottom - top) as u64 >= EDGE as u64 {
+            edges += 1;
+        }
+        columns += 1;
+    }
+    if columns == 0 {
+        0.0
+    } else {
+        edges as f32 / columns as f32
+    }
+}
+
+fn median(mut values: Vec<f32>) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.sort_by(f32::total_cmp);
+    values[values.len() / 2]
+}
+
 fn ocr_card(
     index: u32,
     cards: u32,
@@ -457,5 +586,104 @@ mod tests {
             color: card,
         };
         assert_eq!(crop.name_strip().height(), 90);
+    }
+
+    fn striped_card(image: &mut RgbImage, left: u32, top: u32, width: u32, height: u32) {
+        for x in left..left + width {
+            let value = if ((x - left) / 2).is_multiple_of(2) {
+                255
+            } else {
+                0
+            };
+            for y in top..top + height {
+                image.put_pixel(x, y, image::Rgb([value, value, value]));
+            }
+        }
+    }
+
+    #[test]
+    fn only_same_parity_layouts_are_centered_subsets() {
+        assert!(is_centered_subset(4, 2));
+        assert!(is_centered_subset(3, 1));
+        assert!(!is_centered_subset(4, 3));
+        assert!(!is_centered_subset(4, 1));
+        assert!(!is_centered_subset(3, 2));
+        assert!(!is_centered_subset(2, 1));
+        assert!(!is_centered_subset(4, 4));
+    }
+
+    #[test]
+    fn a_two_card_row_is_not_a_four_card_row() {
+        let (width, height) = (400, 100);
+        let background = image::Rgb([10, 10, 10]);
+        let top = fixed_top(height);
+        let (left, _, card_width, card_height) = geometry(width, height, 4).unwrap();
+
+        let mut four = RgbImage::from_pixel(width, height, background);
+        for index in 0..4 {
+            striped_card(
+                &mut four,
+                left + index * card_width,
+                top,
+                card_width,
+                card_height,
+            );
+        }
+        assert!(!extra_cells_absent(&four, 4, 2, top));
+
+        let mut two = RgbImage::from_pixel(width, height, background);
+        for index in 1..3 {
+            striped_card(
+                &mut two,
+                left + index * card_width,
+                top,
+                card_width,
+                card_height,
+            );
+        }
+        assert!(extra_cells_absent(&two, 4, 2, top));
+    }
+
+    #[test]
+    fn a_half_card_is_not_an_empty_cell() {
+        let (width, height) = (400, 100);
+        let background = image::Rgb([10, 10, 10]);
+        let top = fixed_top(height);
+        let (left, _, card_width, card_height) = geometry(width, height, 3).unwrap();
+        let mut three = RgbImage::from_pixel(width, height, background);
+        for index in 0..3 {
+            striped_card(
+                &mut three,
+                left + index * card_width,
+                top,
+                card_width,
+                card_height,
+            );
+        }
+        assert!(!extra_cells_absent(&three, 4, 2, top));
+    }
+
+    #[test]
+    fn one_card_in_a_three_card_grid_needs_the_outer_cells_empty() {
+        let (width, height) = (400, 100);
+        let background = image::Rgb([10, 10, 10]);
+        let top = fixed_top(height);
+        let (left, _, card_width, card_height) = geometry(width, height, 3).unwrap();
+
+        let mut one = RgbImage::from_pixel(width, height, background);
+        striped_card(&mut one, left + card_width, top, card_width, card_height);
+        assert!(extra_cells_absent(&one, 3, 1, top));
+
+        let mut three = RgbImage::from_pixel(width, height, background);
+        for index in 0..3 {
+            striped_card(
+                &mut three,
+                left + index * card_width,
+                top,
+                card_width,
+                card_height,
+            );
+        }
+        assert!(!extra_cells_absent(&three, 3, 1, top));
     }
 }
