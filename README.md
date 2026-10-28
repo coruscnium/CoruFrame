@@ -85,7 +85,7 @@ The [Usage guide](https://github.com/coruscnium/CoruFrame/wiki/Usage) covers the
 
 The probe tails `EE.log`. A `RelicExtraction` line arms it, it captures the portal source you grant once, OCRs each card and draws the panel for 20 seconds. A card is priced only at high OCR confidence; everything else shows `?`.
 
-It needs `wlr-layer-shell`, Tesseract with `eng`, the English UI at 100% scale and a 16:9 frame. [Usage](https://github.com/coruscnium/CoruFrame/wiki/Usage) explains the toggle and the logs; [Troubleshooting](https://github.com/coruscnium/CoruFrame/wiki/Troubleshooting) covers a HUD that does not appear.
+It needs `wlr-layer-shell`, Tesseract with `eng`, the English UI at 100% scale and a frame wide enough for the reward card row (calibrated at 3440x1440). [Usage](https://github.com/coruscnium/CoruFrame/wiki/Usage) explains the toggle and the logs; [Troubleshooting](https://github.com/coruscnium/CoruFrame/wiki/Troubleshooting) covers a HUD that does not appear.
 
 ## Is this safe?
 
