@@ -58,8 +58,9 @@ struct AlertMission {
 struct AlertReward {
     #[serde(default)]
     credits: u64,
+    // warframestat names plain items as bare strings; only countedItems are objects.
     #[serde(default)]
-    items: Vec<AlertItem>,
+    items: Vec<String>,
     #[serde(default, rename = "countedItems")]
     counted: Vec<AlertItem>,
 }
@@ -189,8 +190,13 @@ pub struct AlertDto {
 }
 
 fn alert_reward(reward: &AlertReward) -> String {
-    let mut parts = Vec::new();
-    for item in reward.items.iter().chain(reward.counted.iter()) {
+    let mut parts: Vec<String> = reward
+        .items
+        .iter()
+        .filter(|name| !name.is_empty())
+        .cloned()
+        .collect();
+    for item in &reward.counted {
         if item.kind.is_empty() {
             continue;
         }
@@ -441,7 +447,7 @@ mod tests {
       "fissures":[{"tier":"Neo","missionType":"Spy","node":"Nereid (Neptune)","expiry":"2026-10-24T00:43:56.081Z"}],
       "alerts":[{"expiry":"2026-10-24T01:00:00.000Z","mission":{
         "node":"Nimus (Eris)","type":"Hive",
-        "reward":{"credits":17000,"items":[],"countedItems":[{"type":"Road To Tau Event Resource","count":50}]}
+        "reward":{"credits":17000,"items":["Raw Rifle Random Mod"],"countedItems":[{"type":"Road To Tau Event Resource","count":50}]}
       }}],
       "duviriCycle":{"state":"envy","choices":[
         {"category":"normal","choices":["Hydroid","Mirage","Limbo"]},
@@ -463,7 +469,7 @@ mod tests {
         assert_eq!(alert.mission.kind, "Hive");
         assert_eq!(
             alert_reward(&alert.mission.reward),
-            "50 × Road To Tau Event Resource + 17000 credits"
+            "Raw Rifle Random Mod + 50 × Road To Tau Event Resource + 17000 credits"
         );
     }
 
