@@ -2,6 +2,22 @@
 
 Notable changes per release. Versions follow the git tag (`vX.Y.Z`); the tag and all four manifests must agree, which `scripts/version-check.mjs` enforces.
 
+## 1.0.2 (2026-11-05)
+
+### Added
+
+- `ocr-eval` corpus frames accept an optional `squad` hint and score the hinted layout path alongside the unhinted one.
+
+### Changed
+
+- Reward-card geometry is derived from the frame: the row band is a fraction of the frame height, the card width scales with it, and the row is centered on the width, so 16:9 is not assumed.
+
+### Fixed
+
+- The reward row is resolved from the frame, not the squad size. Squad size is only an upper bound now, so a player whose relic failed to crack no longer leaves a phantom card; the HUD scores the four-, three-, two- and one-card layouts and keeps the hinted count when a smaller layout would drop a visible card.
+- The Worldstate panel no longer sits at Offline. warframestat sends plain alert reward items as bare strings, and a single one failed the whole document parse even though the fetch succeeded. Only `countedItems` are objects.
+- Untracking every market item keeps the list empty after a reload instead of restoring the default seed items, which treated a saved empty array as a fresh install.
+
 ## 1.0.1 (2026-10-27)
 
 ### Added
