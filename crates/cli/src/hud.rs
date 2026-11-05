@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use coruframe_core::art;
-use coruframe_core::catalog::{Catalog, ConfidenceTier, Item};
+use coruframe_core::catalog::{self, Catalog, ConfidenceTier, Item};
 use coruframe_core::fetch;
 use coruframe_core::itemdb::{find_reward_component, is_main_blueprint, ComponentRef, ItemDb};
 use coruframe_core::ocr_payload::RewardPayload;
@@ -168,10 +168,9 @@ struct Join {
     counts: Option<HashMap<String, u64>>,
     platinum: PathBuf,
     placeholder: PathBuf,
-    prices: bool,
 }
 
-fn prepare(prices: bool) -> Result<Join> {
+fn prepare() -> Result<Join> {
     let step = Instant::now();
     let catalog =
         coruframe_core::catalog::load(false).map_err(|error| format!("catalog: {error}"))?;
@@ -188,7 +187,6 @@ fn prepare(prices: bool) -> Result<Join> {
         counts,
         platinum: bundled_icon("Platinum.png", PLATINUM_PNG)?,
         placeholder: bundled_icon("PartPlaceholder.png", PART_PLACEHOLDER_PNG)?,
-        prices,
     })
 }
 
@@ -197,7 +195,13 @@ impl Join {
         art::cached(name)
     }
 
-    fn block(&self, reward: &str, index: usize, jobs: &mut Vec<PriceJob>) -> Option<Block> {
+    fn block(
+        &self,
+        reward: &str,
+        index: usize,
+        jobs: &mut Vec<PriceJob>,
+        price: bool,
+    ) -> Option<Block> {
         let Some((parent, component)) = find_reward_component(&self.db, reward) else {
             // A matched market item without a set still gets a name and price.
             if let Some(item) = self.catalog.resolve(reward) {
@@ -209,14 +213,14 @@ impl Join {
                     .as_deref()
                     .and_then(|name| self.image(name))
                     .unwrap_or_else(|| self.placeholder.clone());
-                if self.prices {
+                if price {
                     jobs.push(PriceJob {
                         index,
                         part: Some(item.slug.clone()),
                         set: None,
                     });
                 }
-                eprintln!("hud: {reward} -> no set (name only); price pending");
+                eprintln!("hud: {reward} -> no set (name only)");
                 return Some(Block {
                     part: reward.to_string(),
                     part_price: None,
@@ -225,7 +229,7 @@ impl Join {
                     thumb,
                     parts: Vec::new(),
                     unknown: false,
-                    priced: self.prices,
+                    priced: price,
                 });
             }
             if coruframe_core::catalog::untradeable(reward).is_some() {
@@ -298,7 +302,7 @@ impl Join {
             .catalog
             .resolve(&format!("{set_name} Set"))
             .map(|item| item.slug.clone());
-        if self.prices {
+        if price {
             jobs.push(PriceJob {
                 index,
                 part: part_slug.clone(),
@@ -317,48 +321,67 @@ impl Join {
             thumb: art,
             parts,
             unknown: false,
-            priced: self.prices,
+            priced: price,
         })
     }
 }
 
-// The one rule that keeps a wrong price off the screen: no high tier, no price.
-fn price_enabled(prices: bool, tier: ConfidenceTier, chosen: bool) -> bool {
-    prices && chosen && tier == ConfidenceTier::High
+// Exact text leaves nothing to guess: a card whose OCR text is the matched
+// item's own name is priced even when the confidence heuristics stopped short
+// of the high tier.
+fn exact_ocr_match(chosen: &str, texts: &[String]) -> bool {
+    let chosen = catalog::normalize_ocr(chosen);
+    texts
+        .iter()
+        .any(|text| catalog::normalize_ocr(text) == chosen)
+}
+
+// High tier is always safe. Otherwise an exact, unique reading is still a real
+// item rather than a fuzzy guess, so it may show its own price.
+fn priceable(prices: bool, tier: ConfidenceTier, unique: bool, exact: bool) -> bool {
+    prices && (tier == ConfidenceTier::High || (unique && exact))
 }
 
 // Payload mode: every visible card is drawn, including the ones the probe could
-// not identify. Only a high-confidence card gets a price job; everything else
-// shows `?`.
+// not identify. A chosen card is joined at every tier so it keeps its name, set
+// and icon; the price is the only thing the tier gates.
 fn payload_hud(path: &Path, prices: bool) -> Result<Hud> {
     let started = Instant::now();
     let payload = RewardPayload::load(path)?;
-    let join = prepare(prices)?;
+    let join = prepare()?;
     let mut jobs = Vec::new();
     let mut blocks = Vec::new();
     for card in &payload.cards {
         let tier = card.confidence.tier;
         let chosen = card.chosen.as_ref();
-        // A high card is joined even with --no-prices: it still gets its name,
-        // set and parts, just no price row. Medium and low never reach the join.
-        if tier == ConfidenceTier::High {
+        let want_price = chosen.is_some_and(|chosen| {
+            let texts: Vec<String> = card
+                .ocr
+                .iter()
+                .map(|variant| variant.text.clone())
+                .collect();
+            priceable(
+                prices,
+                tier,
+                card.confidence.evidence.unique,
+                exact_ocr_match(&chosen.name, &texts),
+            )
+        });
+        if let Some(chosen) = chosen {
             let index = blocks.len();
-            if let Some(chosen) = chosen {
-                if let Some(mut block) = join.block(&chosen.name, index, &mut jobs) {
-                    block.priced = price_enabled(prices, tier, true) && block.priced;
-                    if block.priced {
-                        // The probe's cached quote draws immediately; the
-                        // background quote replaces it when it arrives.
-                        block.part_price = card.price;
-                    }
-                    if let (Some(owned), Some(part)) = (card.owned, chosen.part.as_deref()) {
-                        if let Some(mini) = block.parts.iter_mut().find(|mini| mini.name == part) {
-                            mini.owned = Some(owned);
-                        }
-                    }
-                    blocks.push(block);
-                    continue;
+            if let Some(mut block) = join.block(&chosen.name, index, &mut jobs, want_price) {
+                if block.priced {
+                    // The probe's cached quote draws immediately; the
+                    // background quote replaces it when it arrives.
+                    block.part_price = card.price;
                 }
+                if let (Some(owned), Some(part)) = (card.owned, chosen.part.as_deref()) {
+                    if let Some(mini) = block.parts.iter_mut().find(|mini| mini.name == part) {
+                        mini.owned = Some(owned);
+                    }
+                }
+                blocks.push(block);
+                continue;
             }
         }
         let name = chosen
@@ -541,33 +564,50 @@ fn fetch_prices(jobs: Vec<PriceJob>, tx: std::sync::mpsc::Sender<PriceUpdate>) {
             add_slug(&mut sets, slug, job.index);
         }
     }
+    // A cached price draws immediately and is never fetched again. Only the
+    // cards still missing one are worth a request, and the overlay asks for
+    // them now instead of waiting for the app's inventory sweep.
+    let mut missing_parts = Vec::new();
     for (slug, indices) in &parts {
-        if let Some(price) = cached.get(slug) {
-            eprintln!("hud: cached part {slug} -> {price}");
-            for index in indices {
-                let _ = tx.send(PriceUpdate::Part(*index, Some(*price)));
+        match cached.get(slug) {
+            Some(price) => {
+                eprintln!("hud: cached part {slug} -> {price}");
+                for index in indices {
+                    let _ = tx.send(PriceUpdate::Part(*index, Some(*price)));
+                }
             }
+            None => missing_parts.push((slug.clone(), indices.clone())),
         }
     }
+    let mut missing_sets = Vec::new();
     for (slug, indices) in &sets {
-        if let Some(price) = cached.get(slug) {
-            eprintln!("hud: cached set {slug} -> {price}");
-            for index in indices {
-                let _ = tx.send(PriceUpdate::Set(*index, Some(*price)));
+        match cached.get(slug) {
+            Some(price) => {
+                eprintln!("hud: cached set {slug} -> {price}");
+                for index in indices {
+                    let _ = tx.send(PriceUpdate::Set(*index, Some(*price)));
+                }
             }
+            None => missing_sets.push((slug.clone(), indices.clone())),
         }
     }
     let mut pacer = Pacer::new();
-    for (slug, indices) in &parts {
+    for (slug, indices) in &missing_parts {
         let price = pacer.quote(slug);
         eprintln!("hud: part price {slug} -> {price:?}");
+        if let Some(price) = price {
+            price::record_hud_quote(slug, u64::from(price));
+        }
         for index in indices {
             let _ = tx.send(PriceUpdate::Part(*index, price));
         }
     }
-    for (slug, indices) in &sets {
+    for (slug, indices) in &missing_sets {
         let price = pacer.quote(slug);
         eprintln!("hud: set price {slug} -> {price:?}");
+        if let Some(price) = price {
+            price::record_hud_quote(slug, u64::from(price));
+        }
         for index in indices {
             let _ = tx.send(PriceUpdate::Set(*index, price));
         }
@@ -659,6 +699,14 @@ fn draw(
         }
     });
     let (panel, part_labels, set_labels) = build_panel(hud);
+    // The overlay is up, so the app's background queue stands down: its next
+    // request cannot be issued ahead of the card prices. Refreshing the lease
+    // keeps inventory on hold for as long as the window is shown.
+    price::hold_hud_priority();
+    let _priority_timer = glib::timeout_add_seconds_local(10, || {
+        price::hold_hud_priority();
+        glib::ControlFlow::Continue
+    });
     if !hud.prices.is_empty() {
         for label in part_labels.iter().flatten() {
             label.set_text("?");
@@ -724,6 +772,7 @@ fn draw(
         });
     }
     main_loop.run();
+    price::release_hud_priority();
     Ok(())
 }
 
@@ -968,11 +1017,21 @@ mod tests {
     }
 
     #[test]
-    fn only_a_high_confidence_card_can_show_a_price() {
-        assert!(price_enabled(true, ConfidenceTier::High, true));
-        assert!(!price_enabled(true, ConfidenceTier::Medium, true));
-        assert!(!price_enabled(true, ConfidenceTier::Low, true));
-        assert!(!price_enabled(true, ConfidenceTier::High, false));
-        assert!(!price_enabled(false, ConfidenceTier::High, true));
+    fn prices_high_or_exactly_read_cards() {
+        assert!(priceable(true, ConfidenceTier::High, true, false));
+        assert!(priceable(true, ConfidenceTier::Medium, true, true));
+        assert!(!priceable(true, ConfidenceTier::Medium, true, false));
+        assert!(!priceable(true, ConfidenceTier::Medium, false, true));
+        assert!(!priceable(false, ConfidenceTier::High, true, false));
+    }
+
+    #[test]
+    fn exact_text_matches_the_item_name() {
+        let texts = vec!["Styanax Prime Blueprint".to_string()];
+        assert!(exact_ocr_match("Styanax Prime Blueprint", &texts));
+        assert!(!exact_ocr_match("Styanax Prime Systems", &texts));
+        // Spacing and punctuation differ between OCR and the catalog name.
+        let texts = vec!["Styanax Prime  Blueprint.".to_string()];
+        assert!(exact_ocr_match("Styanax Prime Blueprint", &texts));
     }
 }

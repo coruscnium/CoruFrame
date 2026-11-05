@@ -145,15 +145,7 @@ interface RowPrice {
   hint: string;
 }
 
-function variantRank(variant: VariantDto) {
-  return variant.rank ?? 0;
-}
-
-// Exact rank first. Intermediate ranks often have no *online* seller at all
-// (everyone lists R0 or R10), so an adjacent rank keeps the row priced, marked
-// approximate. A rank several steps away is a different price tier, not an
-// estimate: pricing an R2 arcane from R5 is the same bug as an R0 stack valued
-// at R5, so that row stays unpriced instead.
+// Used for rows with no rank at all (refinements are narrowed by subtype).
 function cheapestOf(variants: VariantDto[]): VariantDto | null {
   return variants.reduce<VariantDto | null>(
     (best, variant) =>
@@ -184,29 +176,11 @@ function rowPrice(item: InventoryItemDto): RowPrice {
       ? { platinum: best.platinum, approx: quote.approx, hint: "" }
       : { platinum: null, approx: false, hint: "" };
   }
+  // Only this rank's own orders may price it. Every other rank is a different
+  // price tier, so an unlisted rank stays unpriced rather than guessed.
   const exact = variants.find((variant) => variant.rank === rank);
-  if (exact) return { platinum: exact.platinum, approx: quote.approx, hint: "" };
-  let nearest: VariantDto | null = null;
-  for (const variant of variants) {
-    if (variant.platinum <= 0) continue;
-    if (!nearest) {
-      nearest = variant;
-      continue;
-    }
-    const distance = Math.abs(variantRank(variant) - rank);
-    const best = Math.abs(variantRank(nearest) - rank);
-    if (distance < best || (distance === best && variant.platinum < nearest.platinum)) {
-      nearest = variant;
-    }
-  }
-  if (!nearest || Math.abs(variantRank(nearest) - rank) > 1) {
-    return { platinum: null, approx: false, hint: `No R${rank} listings near this rank` };
-  }
-  return {
-    platinum: nearest.platinum,
-    approx: true,
-    hint: `No R${rank} listings; estimated from R${variantRank(nearest)}`,
-  };
+  if (!exact) return { platinum: null, approx: false, hint: `No R${rank} listings` };
+  return { platinum: exact.platinum, approx: quote.approx, hint: "" };
 }
 
 function priceOf(item: InventoryItemDto): number | null {
@@ -262,9 +236,7 @@ function priceText(item: InventoryItemDto) {
 }
 
 function priceHint(item: InventoryItemDto) {
-  const info = rowPrice(item);
-  if (info.hint) return info.hint;
-  return info.approx ? "Approximate price from the recent-orders feed" : "";
+  return rowPrice(item).hint;
 }
 
 function setPriceText(item: InventoryItemDto) {

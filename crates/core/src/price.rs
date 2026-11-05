@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::Item;
 use crate::fetch;
+use crate::private_fs;
 
 const ORDERS_MAX_AGE: Duration = Duration::from_secs(60);
 pub const RECENT_ORDERS_URL: &str = "https://api.warframe.market/v2/orders/recent";
@@ -344,9 +345,9 @@ pub fn default_filter(item: &Item) -> OrderFilter {
     }
 }
 
-// The recent feed is a broad, cheap seed: up to 500 visible online sell orders
-// created in the last four hours. It is not authoritative for an item's lowest
-// order, so a focused fetch corrects it.
+// The recent feed is a broad, cheap window of up to 500 visible online sell
+// orders created in the last four hours. It feeds the Market tab's trending
+// list only; it never prices an item.
 pub fn recent(json: &str) -> Result<Vec<RecentOrder>, String> {
     Ok(parse(json)?
         .into_iter()
@@ -370,55 +371,6 @@ pub fn recent(json: &str) -> Result<Vec<RecentOrder>, String> {
             })
         })
         .collect())
-}
-
-// The recent feed is one request for hundreds of orders. Grouping it by variant
-// gives the inventory an approximate per-rank price before any book is fetched.
-pub fn recent_variants(orders: &[RecentOrder]) -> Vec<VariantPrice> {
-    type Key = (
-        Option<u64>,
-        Option<u64>,
-        Option<u64>,
-        Option<u64>,
-        Option<String>,
-    );
-    let mut grouped: HashMap<Key, VariantPrice> = HashMap::new();
-    for order in orders {
-        let key = (
-            order.rank,
-            order.charges,
-            order.amber_stars,
-            order.cyan_stars,
-            order.subtype.clone(),
-        );
-        grouped
-            .entry(key)
-            .and_modify(|variant| {
-                variant.platinum = variant.platinum.min(order.platinum);
-                variant.online += 1;
-                variant.quantity += order.quantity;
-            })
-            .or_insert(VariantPrice {
-                rank: order.rank,
-                charges: order.charges,
-                amber_stars: order.amber_stars,
-                cyan_stars: order.cyan_stars,
-                subtype: order.subtype.clone(),
-                platinum: order.platinum,
-                online: 1,
-                quantity: order.quantity,
-            });
-    }
-    let mut variants: Vec<VariantPrice> = grouped.into_values().collect();
-    variants.sort_by(|left, right| {
-        left.rank
-            .cmp(&right.rank)
-            .then(left.amber_stars.cmp(&right.amber_stars))
-            .then(left.cyan_stars.cmp(&right.cyan_stars))
-            .then(left.charges.cmp(&right.charges))
-            .then(left.subtype.cmp(&right.subtype))
-    });
-    variants
 }
 
 pub fn fetch_book(item: &Item, max_age: Duration) -> Result<Book, String> {
@@ -556,32 +508,117 @@ pub fn quote_within(item: &Item, timeout: Duration) -> Result<Option<(u64, usize
     quote_slug(&item.slug, timeout)
 }
 
+// The app owns this file: its background worker writes one authoritative record
+// per item. The overlay never writes it, so it cannot clobber rank variants.
+pub const APP_QUOTES_FILE: &str = "quotes-v4.json";
+// Prices the overlay had to fetch itself, kept so the next overlay can draw
+// them without another request.
+pub const HUD_QUOTES_FILE: &str = "hud-quotes.json";
+const HUD_QUOTE_MAX_AGE_SECS: u64 = 30 * 60;
+// The overlay sets this while it prices the cards on screen; the app's worker
+// stands down so the overlay's requests are never queued behind inventory. The
+// expiry is a safety net if the overlay dies mid-window.
+pub const HUD_PRIORITY_FILE: &str = "hud-priority";
+const HUD_PRIORITY_SECS: u64 = 30;
+
 #[derive(Deserialize)]
 struct CachedQuote {
     #[serde(default)]
     platinum: Option<u64>,
 }
 
-// First-paint prices written by the app (quotes-v3.json). A missing or corrupt
-// file is an empty cache, never an error: live quotes still fill in.
+#[derive(Serialize, Deserialize)]
+pub struct HudQuote {
+    pub platinum: u64,
+    pub updated_at: u64,
+}
+
+fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0)
+}
+
+// The app's exact prices win; the overlay's own fetches fill the gaps, but only
+// while they are recent enough to trust. A missing or corrupt file is an empty
+// cache, never an error: live quotes still fill in.
+fn merge_quotes(app_json: &str, hud_json: &str, now: u64) -> HashMap<String, u32> {
+    let mut prices = HashMap::new();
+    if let Ok(quotes) = serde_json::from_str::<HashMap<String, CachedQuote>>(app_json) {
+        for (slug, quote) in quotes {
+            if let Some(price) = quote.platinum.filter(|price| *price > 0) {
+                if let Ok(price) = u32::try_from(price) {
+                    prices.insert(slug, price);
+                }
+            }
+        }
+    }
+    if let Ok(quotes) = serde_json::from_str::<HashMap<String, HudQuote>>(hud_json) {
+        for (slug, quote) in quotes {
+            if quote.platinum == 0 || now.saturating_sub(quote.updated_at) > HUD_QUOTE_MAX_AGE_SECS
+            {
+                continue;
+            }
+            if let Ok(price) = u32::try_from(quote.platinum) {
+                prices.entry(slug).or_insert(price);
+            }
+        }
+    }
+    prices
+}
+
 pub fn app_quotes() -> HashMap<String, u32> {
-    let path = fetch::cache_dir().join("quotes-v3.json");
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return HashMap::new();
-    };
-    let Ok(quotes) = serde_json::from_str::<HashMap<String, CachedQuote>>(&text) else {
-        return HashMap::new();
-    };
-    quotes
-        .into_iter()
-        .filter_map(|(slug, quote)| {
-            quote
-                .platinum
-                .filter(|price| *price > 0)
-                .and_then(|price| u32::try_from(price).ok())
-                .map(|price| (slug, price))
-        })
-        .collect()
+    let dir = fetch::cache_dir();
+    let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap_or_default();
+    merge_quotes(&read(APP_QUOTES_FILE), &read(HUD_QUOTES_FILE), unix_now())
+}
+
+pub fn hold_hud_priority() {
+    let dir = fetch::cache_dir();
+    if private_fs::ensure_private_dir(&dir).is_err() {
+        return;
+    }
+    let until = unix_now() + HUD_PRIORITY_SECS;
+    let _ = private_fs::write_private(&dir.join(HUD_PRIORITY_FILE), until.to_string().as_bytes());
+}
+
+pub fn release_hud_priority() {
+    let _ = std::fs::remove_file(fetch::cache_dir().join(HUD_PRIORITY_FILE));
+}
+
+pub fn hud_priority_active(now: u64) -> bool {
+    std::fs::read_to_string(fetch::cache_dir().join(HUD_PRIORITY_FILE))
+        .ok()
+        .and_then(|text| text.trim().parse::<u64>().ok())
+        .is_some_and(|until| now < until)
+}
+
+// Called by the overlay after it fetches a missing card price. Read-modify-write
+// is safe because only the overlay process writes this file.
+pub fn record_hud_quote(slug: &str, platinum: u64) {
+    if platinum == 0 {
+        return;
+    }
+    let dir = fetch::cache_dir();
+    if private_fs::ensure_private_dir(&dir).is_err() {
+        return;
+    }
+    let path = dir.join(HUD_QUOTES_FILE);
+    let mut quotes: HashMap<String, HudQuote> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default();
+    quotes.insert(
+        slug.to_string(),
+        HudQuote {
+            platinum,
+            updated_at: unix_now(),
+        },
+    );
+    if let Ok(json) = serde_json::to_vec(&quotes) {
+        let _ = private_fs::write_private(&path, &json);
+    }
 }
 
 #[cfg(test)]
@@ -599,6 +636,27 @@ mod tests {
     #[test]
     fn ignores_offline_hidden_and_buy_orders() {
         assert_eq!(min_sell(ORDERS).unwrap(), Some((30, 2)));
+    }
+
+    #[test]
+    fn merges_app_and_overlay_quotes_with_ttl_and_precedence() {
+        let app = r#"{"a":{"platinum":10},"b":{"platinum":0},"c":{"platinum":99}}"#;
+        let hud = r#"{"a":{"platinum":5,"updated_at":1990},
+                      "b":{"platinum":7,"updated_at":1990},
+                      "d":{"platinum":8,"updated_at":1990},
+                      "e":{"platinum":9,"updated_at":0}}"#;
+        let prices = merge_quotes(app, hud, 2000);
+        assert_eq!(prices.get("a"), Some(&10), "the app's exact read wins");
+        assert_eq!(prices.get("b"), Some(&7), "an overlay fetch fills a gap");
+        assert_eq!(prices.get("c"), Some(&99));
+        assert_eq!(prices.get("d"), Some(&8));
+        assert_eq!(prices.get("e"), None, "stale overlay prices are ignored");
+    }
+
+    #[test]
+    fn corrupt_quote_files_are_an_empty_cache() {
+        assert!(merge_quotes("not json", "{}", 2000).is_empty());
+        assert!(merge_quotes("{}", "[]", 2000).is_empty());
     }
 
     #[test]
@@ -807,56 +865,5 @@ mod filter_tests {
         assert_eq!(book.min_sell, Some(30));
         assert_eq!(book.sell[0].amber_stars, Some(3));
         assert_eq!(book.sell[0].cyan_stars, Some(2));
-    }
-}
-
-#[cfg(test)]
-mod recent_variant_tests {
-    use super::*;
-
-    const RECENT: &str = r#"{"data":[
-      {"type":"sell","platinum":20,"quantity":1,"visible":true,"itemId":"i1","rank":10,"user":{"status":"online","ingameName":"a"}},
-      {"type":"sell","platinum":18,"quantity":2,"visible":true,"itemId":"i1","rank":10,"user":{"status":"ingame","ingameName":"b"}},
-      {"type":"sell","platinum":3,"quantity":4,"visible":true,"itemId":"i1","rank":0,"user":{"status":"online","ingameName":"c"}},
-      {"type":"sell","platinum":50,"quantity":1,"visible":true,"itemId":"i1","rank":5,"user":{"status":"online","ingameName":"d"}}
-    ]}"#;
-
-    #[test]
-    fn groups_recent_orders_by_rank() {
-        let orders = recent(RECENT).unwrap();
-        let variants = recent_variants(&orders);
-        assert_eq!(variants.len(), 3);
-        let rank_10 = variants
-            .iter()
-            .find(|variant| variant.rank == Some(10))
-            .unwrap();
-        assert_eq!(rank_10.platinum, 18);
-        assert_eq!(rank_10.online, 2);
-        assert_eq!(rank_10.quantity, 3);
-        assert_eq!(variants[0].rank, Some(0));
-    }
-
-    #[test]
-    fn default_filter_picks_the_max_recent_variant() {
-        let catalog = crate::catalog::Catalog::from_json(
-            r#"{"data":[{"id":"i1","slug":"vitality","gameRef":"/Vitality","tags":["mod"],
-               "maxRank":10,"subtypes":["regular"],"i18n":{"en":{"name":"Vitality"}}}]}"#,
-        )
-        .unwrap();
-        let item = catalog.resolve("vitality").unwrap();
-        let orders = recent(
-            r#"{"data":[
-              {"type":"sell","platinum":3,"quantity":1,"visible":true,"itemId":"i1","rank":0,"subtype":"regular","user":{"status":"online","ingameName":"c"}},
-              {"type":"sell","platinum":18,"quantity":1,"visible":true,"itemId":"i1","rank":10,"subtype":"regular","user":{"status":"online","ingameName":"b"}}
-            ]}"#,
-        )
-        .unwrap();
-        let filter = default_filter(item);
-        let variants = recent_variants(&orders);
-        let default = variants
-            .iter()
-            .find(|variant| filter.matches_variant(variant))
-            .unwrap();
-        assert_eq!(default.platinum, 18);
     }
 }

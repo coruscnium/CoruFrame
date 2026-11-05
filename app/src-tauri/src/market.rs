@@ -34,9 +34,10 @@ const MAX_RETRIES: u8 = 3;
 // on a short cooldown instead of freezing it for the six-hour inventory TTL.
 const EMPTY_TTL_SECS: u64 = 30 * 60;
 const SWEEP_INTERVAL_SECS: u64 = 5 * 60;
-// Subtype-aware records use a different key shape, so the old rank-only file
-// must not be read: an Intact quote would otherwise answer a Radiant row.
-const QUOTES_FILE: &str = "quotes-v3.json";
+// Records hold only fetched prices now. v3 also carried guesses seeded from the
+// recent-orders feed, so it must not be read. Shared with the overlay, which
+// reads the same file for its first paint.
+const QUOTES_FILE: &str = price::APP_QUOTES_FILE;
 
 #[derive(Clone, Serialize)]
 pub struct MarketItemDto {
@@ -368,58 +369,6 @@ fn sweep_old_market_files(dir: &Path, now: SystemTime) {
     }
 }
 
-// The recent feed may only seed a record that has no authoritative price. A
-// book or top read is exact, and letting a newer recent sample replace it would
-// downgrade the headline while `approx` stayed false, or reset the timestamp
-// and delay the next authoritative recheck. Returns the DTO to emit when the
-// record changed.
-fn seed_from_recent(
-    record: &mut QuoteRecord,
-    item: &Item,
-    group: &[price::RecentOrder],
-    now: u64,
-) -> Option<QuoteDto> {
-    if !record.approx && record.platinum.is_some() {
-        return None;
-    }
-    // The headline must describe the same variant the worker uses, not the
-    // cheapest order across every rank.
-    let filter = price::default_filter(item);
-    let variants = price::recent_variants(group);
-    let default = variants
-        .iter()
-        .find(|variant| filter.matches_variant(variant))
-        .map(|variant| (variant.platinum, variant.online));
-    // Once a book or rank read exists, keep its variants and fill the gaps so
-    // one recent cycle cannot wipe other inventory ranks.
-    if record.approx && record.checked.is_empty() {
-        record.variants = variants;
-    } else {
-        for variant in variants {
-            if !record
-                .variants
-                .iter()
-                .any(|existing| MarketService::same_variant(existing, &variant))
-            {
-                record.variants.push(variant);
-            }
-        }
-    }
-    record.updated_at = now;
-    if let Some((price, online)) = default {
-        record.platinum = Some(price);
-        record.online = online;
-        record.approx = true;
-        if record.history.last() != Some(&price) {
-            record.history.push(price);
-            if record.history.len() > 32 {
-                record.history.remove(0);
-            }
-        }
-    }
-    Some(quote_dto(&item.slug, Some(record)))
-}
-
 impl MarketService {
     pub fn new(app: AppHandle, catalog: Arc<Catalog>) -> Self {
         let inner = Arc::new(Mutex::new(Inner::default()));
@@ -459,6 +408,14 @@ impl MarketService {
             let mut last_cache_sweep = unix_now();
             loop {
                 let now = unix_now();
+                // The overlay is pricing the cards on its screen. Its requests
+                // go first, so the inventory queue and the recent feed hold
+                // until its window closes.
+                if price::hud_priority_active(now) {
+                    service.maybe_save();
+                    std::thread::sleep(Duration::from_millis(500));
+                    continue;
+                }
                 if now.saturating_sub(last_cache_sweep) >= CACHE_SWEEP_INTERVAL_SECS {
                     last_cache_sweep = now;
                     sweep_old_market_files(&fetch::cache_dir(), SystemTime::now());
@@ -526,6 +483,18 @@ impl MarketService {
                         },
                         background,
                     );
+                    // The overlay may have appeared during the pacing sleep.
+                    // Give the job back to the head rather than take a request
+                    // slot from the card prices.
+                    if background && price::hud_priority_active(unix_now()) {
+                        let mut inner = service.inner.lock().unwrap();
+                        let key = (slug.clone(), mode.clone());
+                        if !inner.queued.contains(&key) {
+                            inner.queued.insert(key.clone());
+                            push_job(&mut inner, key, true);
+                        }
+                        continue;
+                    }
                     let failed = match &mode {
                         QueueMode::Top(key) => {
                             // Inventory rows only need their own variant: the
@@ -712,8 +681,8 @@ impl MarketService {
     }
 
     // The market answered with no online sellers for this variant. That is not
-    // a price, so only the attempt is recorded; the record keeps its freshness
-    // and the recent feed can still fill the gap.
+    // a price, so only the attempt is recorded and the row stays unpriced until
+    // the empty cooldown lets it ask again.
     fn mark_empty(&self, slug: &str, key: &VariantKey) {
         let now = unix_now();
         let mut inner = self.inner.lock().unwrap();
@@ -743,14 +712,6 @@ impl MarketService {
                     continue;
                 }
                 if attempted_within(record, key, now) {
-                    continue;
-                }
-                // An item with no ranked variants is priced by its headline,
-                // so a rank-0 inventory row is not missing one.
-                if key.rank.is_some()
-                    && record.platinum.is_some()
-                    && record.variants.iter().all(|variant| variant.rank.is_none())
-                {
                     continue;
                 }
                 pairs.push((slug.clone(), key.clone()));
@@ -825,8 +786,6 @@ impl MarketService {
                     .then(left.charges.cmp(&right.charges))
                     .then(left.subtype.cmp(&right.subtype))
             });
-            // A top fetch is exact for its ranks, so the recent feed must not
-            // overwrite the merged variants with its rougher sample.
             record.approx = false;
             let filter = price::default_filter(item);
             if let Some(variant) = variants
@@ -859,8 +818,6 @@ impl MarketService {
                 .push(order.clone());
         }
 
-        let now = unix_now();
-        let mut updates = Vec::new();
         let mut trending = Vec::new();
         {
             let mut inner = self.inner.lock().unwrap();
@@ -878,11 +835,6 @@ impl MarketService {
                     quantity,
                     min_sell: Some(min),
                 });
-                let record = inner.quotes.entry(item.slug.clone()).or_default();
-                if let Some(dto) = seed_from_recent(record, item, &group, now) {
-                    inner.dirty = true;
-                    updates.push(dto);
-                }
             }
             trending.sort_by(|left, right| {
                 right
@@ -893,9 +845,6 @@ impl MarketService {
             });
             trending.truncate(12);
             inner.trending = trending.clone();
-        }
-        if !updates.is_empty() {
-            let _ = self.app.emit("market-quotes", updates);
         }
         let _ = self.app.emit("market-trending", trending);
     }
@@ -1385,69 +1334,6 @@ mod tests {
             }),
             now
         ));
-    }
-
-    #[test]
-    fn recent_cannot_replace_an_authoritative_price() {
-        let catalog = Catalog::from_json(
-            r#"{"data":[{"id":"i1","slug":"vitality","gameRef":"/Vitality","tags":["mod"],
-               "i18n":{"en":{"name":"Vitality"}}}]}"#,
-        )
-        .unwrap();
-        let item = catalog.by_id("i1").unwrap();
-        let fetched_at = 1_000_000;
-        let now = fetched_at + QUOTE_TTL_SECS + 60;
-        let mut record = QuoteRecord {
-            platinum: Some(42),
-            online: 3,
-            approx: false,
-            updated_at: fetched_at,
-            ..Default::default()
-        };
-        let group = vec![price::RecentOrder {
-            item_id: "i1".to_string(),
-            platinum: 7,
-            quantity: 1,
-            ingame_name: String::new(),
-            created_at: String::new(),
-            rank: None,
-            charges: None,
-            amber_stars: None,
-            cyan_stars: None,
-            subtype: None,
-        }];
-        assert!(seed_from_recent(&mut record, item, &group, now).is_none());
-        assert_eq!(record.platinum, Some(42));
-        assert_eq!(record.online, 3);
-        assert!(!record.approx);
-        assert_eq!(record.updated_at, fetched_at);
-    }
-
-    #[test]
-    fn recent_seeds_an_unpriced_record_as_approximate() {
-        let catalog = Catalog::from_json(
-            r#"{"data":[{"id":"i1","slug":"vitality","gameRef":"/Vitality","tags":["mod"],
-               "i18n":{"en":{"name":"Vitality"}}}]}"#,
-        )
-        .unwrap();
-        let item = catalog.by_id("i1").unwrap();
-        let mut record = QuoteRecord::default();
-        let group = vec![price::RecentOrder {
-            item_id: "i1".to_string(),
-            platinum: 7,
-            quantity: 1,
-            ingame_name: String::new(),
-            created_at: String::new(),
-            rank: None,
-            charges: None,
-            amber_stars: None,
-            cyan_stars: None,
-            subtype: None,
-        }];
-        let dto = seed_from_recent(&mut record, item, &group, 99).unwrap();
-        assert_eq!(dto.platinum, Some(7));
-        assert!(dto.approx);
-        assert_eq!(record.updated_at, 99);
     }
 
     #[test]
