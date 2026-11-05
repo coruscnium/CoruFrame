@@ -2,6 +2,22 @@
 
 Notable changes per release. Versions follow the git tag (`vX.Y.Z`); the tag and all four manifests must agree, which `scripts/version-check.mjs` enforces.
 
+## 1.0.3 (2026-11-05)
+
+### Added
+
+- The reward overlay caches the prices it fetches in `hud-quotes.json` and reuses them, so only cards still missing a price cost a request. It also reads the app's fetched prices for its first paint.
+- While the overlay is on screen it holds the app's background market queue, so its card prices are never queued behind inventory or the recent-orders feed.
+
+### Changed
+
+- Inventory rows are priced only from their own rank's listings (or the item's headline when it has no ranks). A rank with no orders now shows no price instead of borrowing another rank's.
+- A reward card the matcher identified is drawn with its icon, set and parts at every confidence tier. It shows a price when the tier is high or when the OCR text is an exact, unique match for the item's name.
+
+### Fixed
+
+- The recent-orders feed no longer prices anything; it only feeds the Market tab's trending list. Guessed variants are gone and the quote cache moved to `quotes-v4.json`, so the inventory total no longer moves with cached estimates.
+
 ## 1.0.2 (2026-11-05)
 
 ### Added

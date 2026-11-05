@@ -80,7 +80,7 @@
 
         cargoRoot = "app/src-tauri";
         buildAndTestSubdir = "app/src-tauri";
-        cargoHash = "sha256-7h3pzgB5qKk7EkCk9WDqjpNj6MM1aZ5/Mri32JkFI3Q=";
+        cargoHash = "sha256-D4jHg6fHIcozMC+r9bjubylFc/XccB1mjUDZkxq/2pA=";
         doCheck = false;
 
         nativeBuildInputs = with pkgs; [
