@@ -150,9 +150,10 @@ function variantRank(variant: VariantDto) {
 }
 
 // Exact rank first. Intermediate ranks often have no *online* seller at all
-// (everyone lists R0 or R10), so the nearest rank keeps the row priced. Those
-// values are always marked approximate: the old bug was an R0 stack silently
-// valued at R5, and the marker is what stops that from happening again.
+// (everyone lists R0 or R10), so an adjacent rank keeps the row priced, marked
+// approximate. A rank several steps away is a different price tier, not an
+// estimate: pricing an R2 arcane from R5 is the same bug as an R0 stack valued
+// at R5, so that row stays unpriced instead.
 function cheapestOf(variants: VariantDto[]): VariantDto | null {
   return variants.reduce<VariantDto | null>(
     (best, variant) =>
@@ -198,7 +199,9 @@ function rowPrice(item: InventoryItemDto): RowPrice {
       nearest = variant;
     }
   }
-  if (!nearest) return { platinum: null, approx: false, hint: "" };
+  if (!nearest || Math.abs(variantRank(nearest) - rank) > 1) {
+    return { platinum: null, approx: false, hint: `No R${rank} listings near this rank` };
+  }
   return {
     platinum: nearest.platinum,
     approx: true,
