@@ -36,6 +36,7 @@ export interface QuoteDto {
   platinum: number | null;
   online: number;
   approx: boolean;
+  queried: boolean;
   updated_at: number;
   history: number[];
   variants: VariantDto[];

@@ -8,7 +8,7 @@ import TierMark from "../components/TierMark.vue";
 import WfIcon from "../components/WfIcon.vue";
 import { relicEntries, type RelicEntryDto } from "../lib/api";
 import { relicImage } from "../lib/equipment";
-import { formatDucats, formatPercent, formatPlatinum } from "../lib/format";
+import { formatDucats, formatPercent, formatPlatinum, MISSING } from "../lib/format";
 import { useCompactTabs } from "../lib/useCompactTabs";
 import { inventory, loadInventory } from "../stores/inventory";
 import { initMarket, loadCachedQuotes, market } from "../stores/market";
@@ -64,6 +64,7 @@ interface PlanReward {
   chance: number;
   price: number | null;
   ducats: number | null;
+  priceState: "priced" | "unsold" | "pending" | "untradeable";
 }
 
 interface PlanRow {
@@ -84,11 +85,22 @@ const plans = computed<PlanRow[]>(() => {
     if (!entry) continue;
     if (entry.tier.toLowerCase() === "requiem") continue;
     let priced = false;
+    let known = false;
     let platinum = 0;
     let ducats = 0;
     const rewards = entry.rewards.map((reward) => {
       const quote = reward.slug ? market.quotes[reward.slug] : undefined;
       const price = quote?.platinum ?? null;
+      // An existing record with no price means the market has no online
+      // seller; it still contributes 0p. No record at all is just unfetched.
+      const priceState: PlanReward["priceState"] = !reward.slug
+        ? "untradeable"
+        : price != null
+          ? "priced"
+          : quote?.queried
+            ? "unsold"
+            : "pending";
+      if (quote?.queried) known = true;
       if (price != null) {
         priced = true;
         platinum += (reward.chance / 100) * price;
@@ -99,6 +111,7 @@ const plans = computed<PlanRow[]>(() => {
         chance: reward.chance,
         price,
         ducats: reward.ducats,
+        priceState,
       };
     });
     rows.push({
@@ -108,7 +121,7 @@ const plans = computed<PlanRow[]>(() => {
       state: entry.state,
       count: item.count,
       rewards,
-      expectedPlat: priced ? Number(platinum.toFixed(1)) : null,
+      expectedPlat: priced || known ? Number(platinum.toFixed(1)) : null,
       expectedDucats: ducats,
     });
   }
@@ -117,6 +130,21 @@ const plans = computed<PlanRow[]>(() => {
 
 function labelOf(relic: PlanRow) {
   return `${relic.tier} ${relic.name} ${relic.state}`;
+}
+
+function priceLabel(reward: PlanReward) {
+  if (reward.price != null) return formatPlatinum(reward.price);
+  if (reward.priceState === "unsold") return "!?";
+  if (reward.priceState === "pending") return "?";
+  return MISSING;
+}
+
+function priceHint(reward: PlanReward) {
+  if (reward.priceState === "unsold")
+    return "No online seller; counted as 0p in the average";
+  if (reward.priceState === "pending") return "Price not fetched yet";
+  if (reward.priceState === "untradeable") return "Not tradable";
+  return "";
 }
 
 const visible = computed(() => {
@@ -358,7 +386,12 @@ onMounted(() => {
             <div v-for="reward in relic.rewards" :key="reward.name" class="relic-reward">
               <span class="relic-reward-name">{{ reward.name }}</span>
               <span class="relic-chance">{{ formatPercent(reward.chance) }}</span>
-              <span class="relic-price">{{ formatPlatinum(reward.price) }}</span>
+              <span
+                class="relic-price"
+                :class="reward.priceState"
+                :title="priceHint(reward)"
+                >{{ priceLabel(reward) }}</span
+              >
             </div>
           </div>
         </article>

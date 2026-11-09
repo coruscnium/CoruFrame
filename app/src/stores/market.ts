@@ -160,6 +160,7 @@ function initMock() {
       platinum: row.price > 0 ? row.price : null,
       online: row.online,
       approx: false,
+      queried: true,
       updated_at: now,
       history: [...row.points],
       variants: [],

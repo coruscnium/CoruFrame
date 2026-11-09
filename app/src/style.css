@@ -2318,6 +2318,16 @@ body.dialog-open .workspace {
   font-variant-numeric: tabular-nums;
 }
 
+.relic-price.pending,
+.relic-price.untradeable {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.relic-price.unsold {
+  color: var(--warning);
+}
+
 /* Rivens */
 
 .riven-generated {

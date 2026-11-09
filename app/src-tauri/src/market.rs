@@ -65,6 +65,9 @@ pub struct QuoteDto {
     pub platinum: Option<u64>,
     pub online: usize,
     pub approx: bool,
+    // A record exists for this slug, so a null platinum means the market has
+    // no online seller rather than "not fetched yet".
+    pub queried: bool,
     pub updated_at: u64,
     pub history: Vec<u64>,
     pub variants: Vec<price::VariantPrice>,
@@ -221,6 +224,7 @@ fn quote_dto(slug: &str, record: Option<&QuoteRecord>) -> QuoteDto {
             platinum: record.platinum,
             online: record.online,
             approx: record.approx,
+            queried: true,
             updated_at: record.updated_at,
             history: record
                 .history
@@ -237,6 +241,7 @@ fn quote_dto(slug: &str, record: Option<&QuoteRecord>) -> QuoteDto {
             platinum: None,
             online: 0,
             approx: false,
+            queried: false,
             updated_at: 0,
             history: Vec::new(),
             variants: Vec::new(),
@@ -662,34 +667,45 @@ impl MarketService {
     // Record a terminal outcome so the short cooldown, not a retry loop,
     // decides when this pair is asked for again.
     fn mark_checked(&self, slug: &str, mode: &QueueMode) {
-        let mut inner = self.inner.lock().unwrap();
-        let record = inner.quotes.entry(slug.to_string()).or_default();
-        if let QueueMode::Top(key) = mode {
-            if !record.checked.contains(key) {
-                record.checked.push(key.clone());
+        let dto = {
+            let mut inner = self.inner.lock().unwrap();
+            let record = inner.quotes.entry(slug.to_string()).or_default();
+            if let QueueMode::Top(key) = mode {
+                if !record.checked.contains(key) {
+                    record.checked.push(key.clone());
+                }
+                record.attempted.retain(|(at, _)| at != key);
+                record.attempted.push((key.clone(), unix_now()));
             }
-            record.attempted.retain(|(at, _)| at != key);
-            record.attempted.push((key.clone(), unix_now()));
-        }
-        // A book has no variant marker, so a never-priced one also needs a
-        // fresh timestamp to keep `enqueue_one` quiet until the book TTL
-        // expires.
-        if *mode == QueueMode::Book && record.variants.is_empty() && record.platinum.is_none() {
-            record.updated_at = unix_now();
-        }
-        inner.dirty = true;
+            // A book has no variant marker, so a never-priced one also needs a
+            // fresh timestamp to keep `enqueue_one` quiet until the book TTL
+            // expires.
+            if *mode == QueueMode::Book && record.variants.is_empty() && record.platinum.is_none() {
+                record.updated_at = unix_now();
+            }
+            let dto = quote_dto(slug, Some(record));
+            inner.dirty = true;
+            dto
+        };
+        let _ = self.app.emit("market-quotes", vec![dto]);
     }
 
     // The market answered with no online sellers for this variant. That is not
     // a price, so only the attempt is recorded and the row stays unpriced until
-    // the empty cooldown lets it ask again.
+    // the empty cooldown lets it ask again. The event lets the UI say "no
+    // seller" instead of leaving the row looking unfetched.
     fn mark_empty(&self, slug: &str, key: &VariantKey) {
         let now = unix_now();
-        let mut inner = self.inner.lock().unwrap();
-        let record = inner.quotes.entry(slug.to_string()).or_default();
-        record.attempted.retain(|(at, _)| at != key);
-        record.attempted.push((key.clone(), now));
-        inner.dirty = true;
+        let dto = {
+            let mut inner = self.inner.lock().unwrap();
+            let record = inner.quotes.entry(slug.to_string()).or_default();
+            record.attempted.retain(|(at, _)| at != key);
+            record.attempted.push((key.clone(), now));
+            let dto = quote_dto(slug, Some(record));
+            inner.dirty = true;
+            dto
+        };
+        let _ = self.app.emit("market-quotes", vec![dto]);
     }
 
     // Recheck the whole inventory once its quotes age out. Pairs whose price
@@ -1120,6 +1136,15 @@ mod tests {
         .unwrap();
         assert!(record.variants.is_empty());
         assert_eq!(record.platinum, Some(3));
+    }
+
+    #[test]
+    fn a_stored_record_tells_an_empty_price_from_an_unfetched_one() {
+        assert!(!quote_dto("missing", None).queried);
+        let record = QuoteRecord::default();
+        let dto = quote_dto("empty", Some(&record));
+        assert!(dto.queried);
+        assert_eq!(dto.platinum, None);
     }
 
     #[test]
