@@ -905,14 +905,16 @@ impl MarketService {
     // The inventory view needs the cached quotes right away, then the queue
     // refreshes them in the background. `refresh` covers the rows on screen:
     // they revalidate immediately instead of waiting out the inventory TTL.
-    // Any other price the UI shows (relic rewards) joins the same queue, TTL
-    // and cache as the inventory, so a slug asked for twice costs one fetch.
+    // Any other price the UI shows (relic rewards) joins the same TTL and
+    // cache as the inventory, so a slug asked for twice costs one fetch. It
+    // takes the head of the queue: a reward left at the back waits for the
+    // whole inventory warm and reads as "unpriced" for many minutes.
     pub fn warm_prices(
         &self,
         rows: impl IntoIterator<Item = (String, Option<u64>, Option<String>)>,
     ) {
         for (slug, rank, subtype) in rows {
-            self.enqueue_one(slug, QueueMode::Top(VariantKey { rank, subtype }), false);
+            self.enqueue_one(slug, QueueMode::Top(VariantKey { rank, subtype }), true);
         }
     }
 
