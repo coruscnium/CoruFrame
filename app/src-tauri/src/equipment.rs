@@ -260,6 +260,20 @@ pub fn relic_subtype(entry: &ItemEntry) -> Option<String> {
 }
 
 pub fn market_item(catalog: &Catalog, entry: &ItemEntry) -> Option<MarketItemDto> {
+    // WFCD splits riven mods into the veiled stack (`Raw*RandomMod`) and the
+    // revealed copy (`*RandomModRare`), but the market's only riven items are
+    // the veiled families and their gameRef carries the revealed path. Matching
+    // by path therefore attributes every revealed riven to a veiled listing;
+    // match the veiled stack by name and leave revealed rivens unlisted.
+    let base = entry.unique_name.rsplit('/').next().unwrap_or_default();
+    if base.ends_with("RandomModRare") {
+        return None;
+    }
+    if base.starts_with("Raw") && base.ends_with("RandomMod") {
+        return catalog
+            .resolve(&format!("{} (Veiled)", entry.name))
+            .map(market::item_dto);
+    }
     catalog
         .resolve(&entry.unique_name)
         .or_else(|| {
@@ -540,6 +554,46 @@ mod tests {
             market_item(&catalog, requiem).unwrap().slug,
             "requiem_eterna_relic"
         );
+    }
+
+    const RIVENS: &str = r#"[
+      {"uniqueName":"/Lotus/Upgrades/Mods/Randomized/RawRifleRandomMod","name":"Rifle Riven Mod",
+       "category":"Mods","type":"Rifle Riven Mod"},
+      {"uniqueName":"/Lotus/Upgrades/Mods/Randomized/LotusRifleRandomModRare","name":"Rifle Riven Mod",
+       "category":"Mods","type":"Rifle Riven Mod"}
+    ]"#;
+
+    const RIVEN_CATALOG: &str = r#"{"data":[
+      {"slug":"rifle_riven_mod_veiled",
+       "gameRef":"/Lotus/Upgrades/Mods/Randomized/LotusRifleRandomModRare",
+       "tags":["mod","riven_mod","veiled_riven"],
+       "i18n":{"en":{"name":"Rifle Riven Mod (Veiled)"}}}
+    ]}"#;
+
+    #[test]
+    fn maps_the_veiled_riven_stack_and_not_revealed_copies() {
+        let db = ItemDb::from_categories(&[("Mods", RIVENS)], 0).unwrap();
+        let catalog = Catalog::from_json(RIVEN_CATALOG).unwrap();
+        let by_path = |path: &str| {
+            db.all()
+                .iter()
+                .find(|entry| entry.unique_name == path)
+                .unwrap()
+        };
+        assert_eq!(
+            market_item(
+                &catalog,
+                by_path("/Lotus/Upgrades/Mods/Randomized/RawRifleRandomMod")
+            )
+            .unwrap()
+            .slug,
+            "rifle_riven_mod_veiled"
+        );
+        assert!(market_item(
+            &catalog,
+            by_path("/Lotus/Upgrades/Mods/Randomized/LotusRifleRandomModRare")
+        )
+        .is_none());
     }
 
     #[test]
