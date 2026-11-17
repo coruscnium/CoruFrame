@@ -42,6 +42,10 @@
           libxkbcommon
           pipewire
           openssl
+          # The workspace asks for rusqlite's `bundled`, but the feature is not
+          # reaching libsqlite3-sys under this toolchain -- the link line asks
+          # for a dynamic -lsqlite3 with no search path. Give it one.
+          sqlite
           gsettings-desktop-schemas
         ];
         # Tesseract is a process, not a link dependency; the wrapper puts it on
@@ -102,6 +106,9 @@
           graphene
           pipewire
           openssl
+          # Same as the CLI: the Tauri crate pulls in coruframe-core, so it
+          # links rusqlite and the system lib is the one that resolves.
+          sqlite
           gsettings-desktop-schemas
         ];
 
